@@ -1,0 +1,393 @@
+openapi: 3.0.0
+info:
+  title: Wren Sync API
+  description: An HTTP API enabling Client <-> Server Sync
+  version: 0.0.1
+tags:
+  - name: Repository
+    description: Repository Metadata
+  - name: Shard
+    description: Shards and Commits
+  - name: User
+    description: Users and Keys
+  - name: Permission
+    description: Permissions Data
+paths:
+  /v1/:
+    get:
+      summary: Get repository information.
+      description: Get repository information.
+      tags:
+        - Repository
+      responses:
+        '200':
+          description: Repository information.
+  /v1/metadata:
+    get:
+      summary: Get repository metadata.
+      description: Get repository metadata.
+      tags:
+        - Repository
+      responses:
+        '200':
+          description: Repository metadata.
+  /v1/shard:
+    get:
+      summary: Get repository shards.
+      description: Get repository shards.
+      tags:
+        - Shard
+      responses:
+        '200':
+          description: Repository shards.
+    post:
+      summary: Create a repository shards.
+      description: Create a repository shards.
+      tags:
+        - Shard
+      responses:
+        '201':
+          description: Shard created.
+  /v1/shard/{id}:
+    get:
+      summary: Get shard data.
+      description: Get shard data.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: Shard data.
+  /v1/shard/{id}/metadata:
+    get:
+      summary: Get shard metadata.
+      description: Get shard metadata.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: Get shard metadata.
+    put:
+      summary: Set shard metadata.
+      description: Set shard metadata.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: Shard metadata set.
+  /v1/shard/{id}/commit:
+    get:
+      summary: Get shard commits.
+      description: Get shard commits.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: Get shard commits.
+    post:
+      summary: Create shard commit.
+      description: Create shard commit.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: Shard commit created.
+  /v1/shard/{id}/commit/{number}:
+    get:
+      summary: Get shard commit.
+      description: Get shard commit.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: number
+          in: path
+          description: Commit ID
+          required: true
+          schema:
+            type: integer
+            format: uint64
+      responses:
+        '200':
+          description: Get shard commit.
+    put:
+      summary: Create shard commit.
+      description: Create shard commit. Will fail unless commit number is the next number in sequence.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: Shard commit created.
+  /v1/user:
+    get:
+      summary: Get repository users.
+      description: Get repository users and their metadata.
+      tags:
+        - User
+      responses:
+        '200':
+          description: Repository users.
+    post:
+      summary: Create repository user.
+      description: Create repository user.
+      tags:
+        - User
+      responses:
+        '201':
+          description: Repository user created.
+  /v1/user/{id}:
+    get:
+      summary: Get user data.
+      description: Get user data.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: User data.
+  /v1/user/{id}/metadata:
+    get:
+      summary: Get user metadata.
+      description: Get user metadata.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: User metadata.
+    put:
+      summary: Set user metadata.
+      description: Set user metadata.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: User metadata set.
+  /v1/user/{id}/key:
+    get:
+      summary: Get user keys.
+      description: Get user keys.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: User keys.
+  /v1/user/{id}/key/{key}:
+    get:
+      summary: Get user key.
+      description: Get user key.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: key
+          in: path
+          description: Key ID
+          required: true
+          schema:
+            type: string
+            format: tbd
+      responses:
+        '200':
+          description: User key.
+    put:
+      summary: Set user key.
+      description: Set user key.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: key
+          in: path
+          description: Key ID
+          required: true
+          schema:
+            type: string
+            format: tbd
+      responses:
+        '201':
+          description: User key set.
+    delete:
+      summary: Remove user key.
+      description: Remove user key.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: key
+          in: path
+          description: Key ID
+          required: true
+          schema:
+            type: string
+            format: tbd
+      responses:
+        '204':
+          description: User key removed.
+  /v1/permission:
+    get:
+      summary: Get repository permissions.
+      description: Get repository permissions.
+      tags:
+        - Permission
+      responses:
+        '200':
+          description: Repository permissions.
+  /v1/permission/{user}/{resource}/{permission}:
+    put:
+      summary: Set permission.
+      description: Set permission.
+      tags:
+        - Permission
+      parameters:
+        - name: user
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: resource
+          in: path
+          description: Resource ID. TODO type:uuidv4?
+          required: true
+          schema:
+            type: string
+        - name: permission
+          in: path
+          description: Permission
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Permission set.
+    delete:
+      summary: Remove permission.
+      description: Remove permission.
+      tags:
+        - Permission
+      parameters:
+        - name: user
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: resource
+          in: path
+          description: Resource ID
+          required: true
+          schema:
+            type: string
+        - name: permission
+          in: path
+          description: Permission
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Permission removed.
