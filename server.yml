@@ -334,35 +334,15 @@ paths:
       responses:
         '200':
           description: Repository permissions.
-  /v1/permission/{user}/{resource}/{permission}:
-    put:
-      summary: Set permission.
-      description: Set permission.
+    post:
+      summary: Set repository permissions.
+      description: Set repository permissions.
       tags:
         - Permission
-      parameters:
-        - name: user
-          in: path
-          description: User ID
-          required: true
-          schema:
-            type: string
-            format: uuidv4
-        - name: resource
-          in: path
-          description: Resource ID. TODO type:uuidv4?
-          required: true
-          schema:
-            type: string
-        - name: permission
-          in: path
-          description: Permission
-          required: true
-          schema:
-            type: string
       responses:
         '201':
-          description: Permission set.
+          description: Set Repository permissions. TODO user, resource type, resource id, permission
+  /v1/permission/{user}/{resource}/{permission}:
     delete:
       summary: Remove permission.
       description: Remove permission.
