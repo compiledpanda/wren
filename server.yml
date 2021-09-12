@@ -255,6 +255,22 @@ paths:
       responses:
         '200':
           description: User keys.
+    post:
+      summary: Add a user key.
+      description: Add a user key.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: User key added.
   /v1/user/{id}/key/{key}:
     get:
       summary: Get user key.
@@ -279,29 +295,6 @@ paths:
       responses:
         '200':
           description: User key.
-    put:
-      summary: Set user key.
-      description: Set user key.
-      tags:
-        - User
-      parameters:
-        - name: id
-          in: path
-          description: User ID
-          required: true
-          schema:
-            type: string
-            format: uuidv4
-        - name: key
-          in: path
-          description: Key ID
-          required: true
-          schema:
-            type: string
-            format: tbd
-      responses:
-        '201':
-          description: User key set.
     delete:
       summary: Remove user key.
       description: Remove user key.
