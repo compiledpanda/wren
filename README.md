@@ -31,6 +31,23 @@ cqrs principles
 ### Local Data Layering
 
 # Components
-* Client Data Manager
-* Client Database Utilities
-* Server Data Manager
+* Client
+    * Repository
+        * Shards & Commits
+    * Router
+        * Local Write
+        * Remote Write
+    * Reciever
+        * Local Sync
+        * Remote Sync
+        * Materialize
+* Database
+    * KV
+    * SQL
+    * Graph
+    * Search
+* Server
+    * Repository
+        * Shards & Commits
+        * Users & Keys
+        * Permissions
