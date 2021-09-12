@@ -3,6 +3,8 @@ info:
   title: Wren Sync API
   description: An HTTP API enabling Client <-> Server Sync
   version: 0.0.1
+servers:
+  - url: http://localhost:8985
 tags:
   - name: Repository
     description: Repository Metadata
@@ -410,7 +412,6 @@ paths:
       responses:
         '204':
           description: Permission removed.
-
 components:
   securitySchemes:
     BearerAuth:
