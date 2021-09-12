@@ -12,16 +12,27 @@ tags:
     description: Users and Keys
   - name: Permission
     description: Permissions Data
+security:
+  - BearerAuth: []
 paths:
   /v1/:
     get:
-      summary: Get repository information.
-      description: Get repository information.
+      summary: Get repository status.
+      description: Get repository status.
       tags:
         - Repository
       responses:
         '200':
-          description: Repository information.
+          description: Repository status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    description: The status.
+                    type: string
+                    enum: [ONLINE]
   /v1/metadata:
     get:
       summary: Get repository metadata.
@@ -31,6 +42,41 @@ paths:
       responses:
         '200':
           description: Repository metadata.
+          headers:
+            Digest:
+              description: A SHA-256 has of the response body
+              schema:
+                type: string
+                example: sha-256=YTU......
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+    put:
+      summary: Set repository metadata.
+      description: Set repository metadata.
+      tags:
+        - Repository
+      parameters:
+        - in: header
+          name: Digest
+          description: The SHA-256 hash of the request body.
+          required: true
+          schema:
+            type: string
+            example: sha-256=YTU......
+      requestBody:
+        description: Binary metadata
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: Repository metadata set.
   /v1/shard:
     get:
       summary: Get repository shards.
@@ -364,3 +410,10 @@ paths:
       responses:
         '204':
           description: Permission removed.
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT 
