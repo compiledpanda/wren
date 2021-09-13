@@ -1,7 +1,23 @@
 openapi: 3.0.0
 info:
-  title: Wren Sync API
-  description: An HTTP API enabling Client <-> Server Sync
+  title: Wren Server API
+  description: |
+    An HTTP API enabling Client <-> Server Sync
+
+    Authentication (Identity) is provided by sending a signed JWT via the Authorization header (Authorization: Bearer <jwt>). The JWT header MUST contain `alg` (the algorithm used to sign) and `typ` (JWT). The payload MUST contain `iat` (issued at time in unix epoch seconds), `exp` (expiration time in unix epoch seconds), and `sub` (user id). The JWT signature MUST be signed using either RS256 OR ES256.
+
+    JWT Validation requires that: 1) header.alg MUST be an approved signature type, 2) header.typ must be JWT, 3) payload.iat MUST be a number and < now, 4) payload.exp MUST be a number and > now, 5) payload.sub MUST be a uuidv4 string, 6) signature MUST be valid for a key associated with payload.sub.
+
+    Each endpoint that MUST Authenticate:
+        
+    * MUST return 401 with the MISSING_AUTHORIZATION_HEADER code when the Authorization header is not present
+    * MUST return 401 with the MALFORMED_AUTHORIZATION_HEADER code when the Authorization header value does not match /^Bearer .+$/
+    * MUST return 401 with the MALFORMED_JWT code when the trimmed JWT does not match /^[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+$/
+    * MUST return 401 with the UNAUTHORIZED code when JWT Validation (see above) fails. TODO specify guidance on revealing which validation requirement failed
+
+    Authorization TODO
+
+    Internal errors should be caught and MUST return a 500 with the INTERNAL_ERROR code. The description MAY contain a secure description of the error.
   version: 0.0.1
 servers:
   - url: http://localhost:8985
@@ -20,7 +36,10 @@ paths:
   /v1/:
     get:
       summary: Get repository status.
-      description: Get repository status.
+      description: |
+        * Implementor MAY Authenticate (see above)
+        * Implementor MUST return 'ONLINE' in the response body on success
+        * TODO Should this endpoint return statistics (# of shards, users, etc.)
       tags:
         - Repository
       responses:
@@ -35,10 +54,19 @@ paths:
                     description: The status.
                     type: string
                     enum: [ONLINE]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/metadata:
     get:
       summary: Get repository metadata.
-      description: Get repository metadata.
+      description: |
+        * Implementor MUST Authenticate (see above)
+        * Implementor MUST Authorize, requiring TODO permissions (see above)
+        * Implementor MUST calculate and set the Digest header for every 2XX response
+        * Implementor MUST return 200 with the metadata in the response body on success
+        * Implementor MUST return 0 bytes in the response body if no metadata is present
       tags:
         - Repository
       responses:
@@ -55,9 +83,22 @@ paths:
               schema:
                 type: string
                 format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
     put:
       summary: Set repository metadata.
-      description: Set repository metadata.
+      description: |
+        * Implementor MUST Authenticate (see above)
+        * Implementor MUST Authorize, requiring TODO permissions (see above)
+        * Implementor MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
+        * Implementor MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
+        * Implementor MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 has of the request body
+        * Implementor MUST store the entire request body as the metadata
+        * Implementor MUST return 201 with an empty body on success
       tags:
         - Repository
       parameters:
@@ -78,7 +119,29 @@ paths:
               format: binary
       responses:
         '201':
-          description: Repository metadata set.
+          description: Repository metadata set (there is no response body).
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MISSING_DIGEST_HEADER, MALFORMED_DIGEST_HEADER, DIGEST_BODY_MISMATCH]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /v1/shard:
     get:
       summary: Get repository shards.
@@ -417,4 +480,51 @@ components:
     BearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: JWT 
+      bearerFormat: JWT
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code:
+                description: The error code.
+                type: string
+                enum: [MISSING_AUTHORIZATION_HEADER, MALFORMED_AUTHORIZATION_HEADER, MALFORMED_JWT, UNAUTHORIZED]
+                example: UNAUTHORIZED
+              description:
+                description: The error description.
+                type: string
+                example: Helpful feedback for the developer.
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code:
+                description: The error code.
+                type: string
+                enum: [TODO]
+              description:
+                description: The error description.
+                type: string
+                example: Helpful feedback for the developer.
+    InternalError:
+      description: Internal Error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code:
+                description: The error code.
+                type: string
+                enum: [INTERNAL_ERROR]
+              description:
+                description: The error description.
+                type: string
+                example: Helpful feedback for the developer.
