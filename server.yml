@@ -1,6 +1,7 @@
 openapi: 3.0.0
 info:
   title: Wren Server API
+  version: 0.0.1
   description: |
     An HTTP API enabling Client <-> Server Sync
 
@@ -20,7 +21,6 @@ info:
 
     ### Misc
     Internal errors MUST be caught and MUST return a 500 with the INTERNAL_ERROR code. The description MAY contain a secure description of the error.
-  version: 0.0.1
 servers:
   - url: http://localhost:8985
 tags:
