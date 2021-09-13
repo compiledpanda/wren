@@ -4,7 +4,8 @@ info:
   description: |
     An HTTP API enabling Client <-> Server Sync
 
-    Authentication (Identity) is provided by sending a signed JWT via the Authorization header (Authorization: Bearer <jwt>). The JWT header MUST contain `alg` (the algorithm used to sign) and `typ` (JWT). The payload MUST contain `iat` (issued at time in unix epoch seconds), `exp` (expiration time in unix epoch seconds), and `sub` (user id). The JWT signature MUST be signed using either RS256 OR ES256.
+    ### Authentication
+    Authentication (Identity) is provided by sending a signed JWT via the Authorization header (Authorization: Bearer <jwt>). The JWT header MUST contain `alg` (the algorithm used to sign) and `typ` (JWT). The payload MUST contain `iat` (issued at time in unix epoch seconds), `exp` (expiration time in unix epoch seconds), and `sub` (user id). The JWT signature MUST be signed utilizing either RS256 OR ES256 and a private key associated with the subject (user).
 
     JWT Validation requires that: 1) header.alg MUST be an approved signature type, 2) header.typ must be JWT, 3) payload.iat MUST be a number and < now, 4) payload.exp MUST be a number and > now, 5) payload.sub MUST be a uuidv4 string, 6) signature MUST be valid for a key associated with payload.sub.
 
@@ -15,9 +16,10 @@ info:
     * MUST return 401 with the MALFORMED_JWT code when the trimmed JWT does not match /^[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+$/
     * MUST return 401 with the UNAUTHORIZED code when JWT Validation (see above) fails. TODO specify guidance on revealing which validation requirement failed
 
-    Authorization TODO
+    ### Authorization TODO
 
-    Internal errors should be caught and MUST return a 500 with the INTERNAL_ERROR code. The description MAY contain a secure description of the error.
+    ### Misc
+    Internal errors MUST be caught and MUST return a 500 with the INTERNAL_ERROR code. The description MAY contain a secure description of the error.
   version: 0.0.1
 servers:
   - url: http://localhost:8985
