@@ -19,8 +19,14 @@ info:
 
     ### Authorization TODO
 
-    ### Misc
+    ### Errors
+    Errors (non-2XX) MUST return with a `Content-Type: application/json` header and a response body in the following format: `{"code": "X_Y_Z", "description": "A b c"}`. The code MUST be a UPPER_SNAKE_CASE string and is part of the API contract. The description MUST be a string. The value of the description string is NOT part of the official API contract and is implementation specific.
+
     Internal errors MUST be caught and MUST return a 500 with the INTERNAL_ERROR code. The description MAY contain a secure description of the error.
+
+    Method Not Allowed errors MAY be caught and MUST return a 405 with the METHOD_NOT_ALLOWED code. The description may contain a secure description of the error.
+
+    Other Implementation Errors MAY be generated and MUST follow the error format described above. For example, a throttled response MAY generate a 429 with a properly formatted error body. These additional errors SHOULD be documented as a part of the implementation documenttaion.
 servers:
   - url: http://localhost:8985
 tags:
