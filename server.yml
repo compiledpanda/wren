@@ -1,0 +1,538 @@
+openapi: 3.0.0
+info:
+  title: Wren Server API
+  version: 0.0.1
+  description: |
+    An HTTP API enabling Client <-> Server Sync
+
+    ### Authentication
+    Authentication (Identity) is provided by sending a signed JWT via the Authorization header (Authorization: Bearer <jwt>). The JWT header MUST contain `alg` (the algorithm used to sign) and `typ` (JWT). The payload MUST contain `iat` (issued at time in unix epoch seconds), `exp` (expiration time in unix epoch seconds), and `sub` (user id). The JWT signature MUST be signed utilizing either RS256 OR ES256 and a private key associated with the subject (user).
+
+    JWT Validation requires that: 1) header.alg MUST be an approved signature type, 2) header.typ must be JWT, 3) payload.iat MUST be a number and < now, 4) payload.exp MUST be a number and > now, 5) payload.sub MUST be a uuidv4 string, 6) signature MUST be valid for a key associated with payload.sub.
+
+    Each endpoint that MUST Authenticate:
+        
+    * MUST return 401 with the MISSING_AUTHORIZATION_HEADER code when the Authorization header is not present
+    * MUST return 401 with the MALFORMED_AUTHORIZATION_HEADER code when the Authorization header value does not match /^Bearer .+$/
+    * MUST return 401 with the MALFORMED_JWT code when the trimmed JWT does not match /^[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+$/
+    * MUST return 401 with the UNAUTHORIZED code when JWT Validation (see above) fails. TODO specify guidance on revealing which validation requirement failed
+
+    ### Authorization TODO
+
+    ### Errors
+    Errors (non-2XX) MUST return with a `Content-Type: application/json` header and a response body in the following format: `{"code": "X_Y_Z", "description": "A b c"}`. The code MUST be a UPPER_SNAKE_CASE string and is part of the API contract. The description MUST be a string. The value of the description string is NOT part of the official API contract and is implementation specific.
+
+    Internal errors MUST be caught and MUST return a 500 with the INTERNAL_ERROR code. The description MAY contain a secure description of the error.
+
+    Method Not Allowed errors MAY be caught and MUST return a 405 with the METHOD_NOT_ALLOWED code. The description may contain a secure description of the error.
+
+    Other Implementation Errors MAY be generated and MUST follow the error format described above. For example, a throttled response MAY generate a 429 with a properly formatted error body. These additional errors SHOULD be documented as a part of the implementation documenttaion.
+servers:
+  - url: http://localhost:8985
+tags:
+  - name: Repository
+    description: Repository Metadata
+  - name: Shard
+    description: Shards and Commits
+  - name: User
+    description: Users and Keys
+  - name: Permission
+    description: Permissions Data
+security:
+  - BearerAuth: []
+paths:
+  /v1/:
+    get:
+      summary: Get repository status.
+      description: |
+        * Implementor MAY Authenticate (see above)
+        * Implementor MUST return 'ONLINE' in the response body on success
+        * TODO Should this endpoint return statistics (# of shards, users, etc.)
+      tags:
+        - Repository
+      responses:
+        '200':
+          description: Repository status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    description: The status.
+                    type: string
+                    enum: [ONLINE]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/metadata:
+    get:
+      summary: Get repository metadata.
+      description: |
+        * Implementor MUST Authenticate (see above)
+        * Implementor MUST Authorize, requiring TODO permissions (see above)
+        * Implementor MUST calculate and set the Digest header for every 2XX response
+        * Implementor MUST return 200 with the metadata in the response body on success
+        * Implementor MUST return 0 bytes in the response body if no metadata is present
+      tags:
+        - Repository
+      responses:
+        '200':
+          description: Repository metadata.
+          headers:
+            Digest:
+              description: A SHA-256 has of the response body
+              schema:
+                type: string
+                example: sha-256=YTU......
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      summary: Set repository metadata.
+      description: |
+        * Implementor MUST Authenticate (see above)
+        * Implementor MUST Authorize, requiring TODO permissions (see above)
+        * Implementor MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
+        * Implementor MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
+        * Implementor MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 has of the request body
+        * Implementor MUST store the entire request body as the metadata
+        * Implementor MUST return 201 with an empty body on success
+      tags:
+        - Repository
+      parameters:
+        - in: header
+          name: Digest
+          description: The SHA-256 hash of the request body.
+          required: true
+          schema:
+            type: string
+            example: sha-256=YTU......
+      requestBody:
+        description: Binary metadata
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: Repository metadata set (there is no response body).
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MISSING_DIGEST_HEADER, MALFORMED_DIGEST_HEADER, DIGEST_BODY_MISMATCH]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/shard:
+    get:
+      summary: Get repository shards.
+      description: Get repository shards.
+      tags:
+        - Shard
+      responses:
+        '200':
+          description: Repository shards.
+    post:
+      summary: Create a repository shards.
+      description: Create a repository shards.
+      tags:
+        - Shard
+      responses:
+        '201':
+          description: Shard created.
+  /v1/shard/{id}:
+    get:
+      summary: Get shard data.
+      description: Get shard data.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: Shard data.
+  /v1/shard/{id}/metadata:
+    get:
+      summary: Get shard metadata.
+      description: Get shard metadata.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: Get shard metadata.
+    put:
+      summary: Set shard metadata.
+      description: Set shard metadata.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: Shard metadata set.
+  /v1/shard/{id}/commit:
+    get:
+      summary: Get shard commits.
+      description: Get shard commits.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: Get shard commits.
+    post:
+      summary: Create shard commit.
+      description: Create shard commit.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: Shard commit created.
+  /v1/shard/{id}/commit/{number}:
+    get:
+      summary: Get shard commit.
+      description: Get shard commit.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: number
+          in: path
+          description: Commit ID
+          required: true
+          schema:
+            type: integer
+            format: uint64
+      responses:
+        '200':
+          description: Get shard commit.
+    put:
+      summary: Create shard commit.
+      description: Create shard commit. Will fail unless commit number is the next number in sequence.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: Shard commit created.
+  /v1/user:
+    get:
+      summary: Get repository users.
+      description: Get repository users and their metadata.
+      tags:
+        - User
+      responses:
+        '200':
+          description: Repository users.
+    post:
+      summary: Create repository user.
+      description: Create repository user.
+      tags:
+        - User
+      responses:
+        '201':
+          description: Repository user created.
+  /v1/user/{id}:
+    get:
+      summary: Get user data.
+      description: Get user data.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: User data.
+  /v1/user/{id}/metadata:
+    get:
+      summary: Get user metadata.
+      description: Get user metadata.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: User metadata.
+    put:
+      summary: Set user metadata.
+      description: Set user metadata.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: User metadata set.
+  /v1/user/{id}/key:
+    get:
+      summary: Get user keys.
+      description: Get user keys.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: User keys.
+    post:
+      summary: Add a user key.
+      description: Add a user key.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: User key added.
+  /v1/user/{id}/key/{key}:
+    get:
+      summary: Get user key.
+      description: Get user key.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: key
+          in: path
+          description: Key ID
+          required: true
+          schema:
+            type: string
+            format: tbd
+      responses:
+        '200':
+          description: User key.
+    delete:
+      summary: Remove user key.
+      description: Remove user key.
+      tags:
+        - User
+      parameters:
+        - name: id
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: key
+          in: path
+          description: Key ID
+          required: true
+          schema:
+            type: string
+            format: tbd
+      responses:
+        '204':
+          description: User key removed.
+  /v1/permission:
+    get:
+      summary: Get repository permissions.
+      description: Get repository permissions.
+      tags:
+        - Permission
+      responses:
+        '200':
+          description: Repository permissions.
+    post:
+      summary: Set repository permissions.
+      description: Set repository permissions.
+      tags:
+        - Permission
+      responses:
+        '201':
+          description: Set Repository permissions. TODO user, resource type, resource id, permission
+  /v1/permission/{user}/{resource}/{permission}:
+    delete:
+      summary: Remove permission.
+      description: Remove permission.
+      tags:
+        - Permission
+      parameters:
+        - name: user
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: resource
+          in: path
+          description: Resource ID
+          required: true
+          schema:
+            type: string
+        - name: permission
+          in: path
+          description: Permission
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Permission removed.
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code:
+                description: The error code.
+                type: string
+                enum: [MISSING_AUTHORIZATION_HEADER, MALFORMED_AUTHORIZATION_HEADER, MALFORMED_JWT, UNAUTHORIZED]
+                example: UNAUTHORIZED
+              description:
+                description: The error description.
+                type: string
+                example: Helpful feedback for the developer.
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code:
+                description: The error code.
+                type: string
+                enum: [TODO]
+              description:
+                description: The error description.
+                type: string
+                example: Helpful feedback for the developer.
+    InternalError:
+      description: Internal Error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code:
+                description: The error code.
+                type: string
+                enum: [INTERNAL_ERROR]
+              description:
+                description: The error description.
+                type: string
+                example: Helpful feedback for the developer.
