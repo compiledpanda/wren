@@ -26,6 +26,7 @@ Requirements:
     * Ease of Use
     * Rich Tooling, Documentation, [Support?]
     * [Powerful framework]
+    * Supports Freemium model (base is free, pay for sync)
 * [Enables Collaboration]
 
 There needs to exist an open-source framework for handling client-first user-controlled data in a way that can be easily synced and shared.
