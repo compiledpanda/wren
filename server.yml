@@ -110,8 +110,8 @@ paths:
       tags:
         - Repository
       parameters:
-        - in: header
-          name: Digest
+        - name: Digest
+          in: header
           description: The SHA-256 hash of the request body.
           required: true
           schema:
@@ -143,22 +143,105 @@ paths:
                     description: The error description.
                     type: string
                     example: Helpful feedback for the developer.
+                required: [code, description]
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalError'
-
   /v1/shard:
     get:
       summary: Get repository shards.
-      description: Get repository shards.
+      description: |
+        * Implementor MUST Authenticate (see above)
+        * Implementor MUST Authorize, requiring TODO permissions (see above)
+        * Implementor MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA
+        * Implementor MUST return 400 with the MALFORMED_AFTER_PARAMETER code when the query parameter `after` is not blank and is not a uuid
+        * Implementor MUST return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer greater than 1
+        * Implementor MAY return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer less than a positive integer determined by the implementor
+        * Implementor MUST return 200 with an list of shards:
+            * in alphanumeric ascending order
+            * starting after the value of the query parameter `after` (if set)
+            * limited to the value of the query parameter `limit` (if set)
+        * Implementor MUST NOT return shards that the user does not have TODO access to
+        * Implementor MUST return shard metadata only when the query parameter `include` contains METADATA
       tags:
         - Shard
+      parameters:
+        - name: include
+          in: query
+          description: Additional information to include
+          required: false
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [METADATA]
+            default: ''
+        - name: after
+          in: query
+          description: Retrieve shards after this one
+          required: false
+          schema:
+            type: string
+            format: uuid
+            default: ''
+        - name: limit
+          in: query
+          description: Maximum number of shards to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
       responses:
         '200':
           description: Repository shards.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    description: Shard data.
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          description: The shard id.
+                          type: string
+                          format: uuid
+                        metadata:
+                          description: The shard metadata (base64 encoded). Only included when ?include=METADATA
+                          type: string
+                          format: base64
+                          example: QXY...
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_INCLUDE_PARAMETER, MALFORMED_AFTER_PARAMETER, MALFORMED_LIMIT_PARAMETER]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
       summary: Create a repository shards.
       description: Create a repository shards.
@@ -180,7 +263,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: Shard data.
@@ -197,7 +280,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: Get shard metadata.
@@ -213,7 +296,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '201':
           description: Shard metadata set.
@@ -230,7 +313,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: Get shard commits.
@@ -246,7 +329,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '201':
           description: Shard commit created.
@@ -263,7 +346,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
         - name: number
           in: path
           description: Commit ID
@@ -286,7 +369,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '201':
           description: Shard commit created.
@@ -506,6 +589,7 @@ components:
                 description: The error description.
                 type: string
                 example: Helpful feedback for the developer.
+            required: [code, description]
     Forbidden:
       description: Forbidden
       content:
@@ -521,6 +605,7 @@ components:
                 description: The error description.
                 type: string
                 example: Helpful feedback for the developer.
+            required: [code, description]
     InternalError:
       description: Internal Error
       content:
@@ -536,3 +621,4 @@ components:
                 description: The error description.
                 type: string
                 example: Helpful feedback for the developer.
+            required: [code, description]
