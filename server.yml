@@ -165,7 +165,8 @@ paths:
             * starting after the value of the query parameter `after` (if set)
             * limited to the value of the query parameter `limit` (if set)
         * Implementor MUST NOT return shards that the user does not have TODO access to
-        * Implementor MUST return shard metadata only when the query parameter `include` contains METADATA
+        * Implementor MUST return shard metadata as a base64 encoded string only when the query parameter `include` contains METADATA
+        * Implementor MUST return an empty string if there is no shard metadata when returning shard metadata
       tags:
         - Shard
       parameters:
@@ -243,17 +244,103 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
     post:
-      summary: Create a repository shards.
-      description: Create a repository shards.
+      summary: Create a repository shard.
+      description: |
+        * Implementor MUST Authenticate (see above)
+        * Implementor MUST Authorize, requiring TODO permissions (see above)
+        * Implementor MUST return 400 with the MALFORMED_REQUEST_BODY code when the request body is not a valid JSON object
+        * Implementor MUST return 400 with the MALFORMED_METADATA_FIELD code when the metadata field is not an empty or base64 encoded string
+        * Implementor MUST generate a new uuid and assign it as the shard ID
+        * Implementor MUST return 200 with the newly created shard ID and base64 encoded metadata
+        * Implementor MUST return an empty string if there is no shard metadata
       tags:
         - Shard
+      requestBody:
+        description: Shard data
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                metadata:
+                  description: Shard metadata (base64 encoded string), or an empty string if there is no shard metadata.
+                  type: string
+                  format: base64
+                  example: QXY...
+              required: [metadata]
       responses:
         '201':
           description: Shard created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    description: The shard id.
+                    type: string
+                    format: uuid
+                  metadata:
+                    description: The shard metadata (base64 encoded).
+                    type: string
+                    format: base64
+                    example: QXY...
+                required: [id, metadata]
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_REQUEST_BODY, MALFORMED_METADATA_FIELD]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/shard/{id}:
     get:
       summary: Get shard data.
       description: Get shard data.
+      tags:
+        - Shard
+      parameters:
+        - name: id
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: include
+          in: query
+          description: Additional information to include
+          required: false
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [METADATA]
+            default: ''
+      responses:
+        '200':
+          description: Shard data.
+    put:
+      summary: Create a shard with a particular ID.
+      description: Set shard data.
       tags:
         - Shard
       parameters:
