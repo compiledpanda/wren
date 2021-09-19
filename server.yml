@@ -83,8 +83,8 @@ paths:
     get:
       summary: Get repository status.
       description: |
-        * Implementor MAY Authenticate (see above)
-        * Implementor MUST return 'ONLINE' in the response body on success
+        * Endpoint MAY Authenticate (see above)
+        * Endpoint MUST return 'ONLINE' in the response body on success
         * TODO Should this endpoint return statistics (# of shards, users, etc.)
       tags:
         - Repository
@@ -108,11 +108,11 @@ paths:
     get:
       summary: Get repository metadata.
       description: |
-        * Implementor MUST Authenticate (see above)
-        * Implementor MUST Authorize, requiring the REPOSITORY:VIEW permission (see above)
-        * Implementor MUST calculate and set the Digest header for every 2XX response
-        * Implementor MUST return 200 with the metadata in the response body on success
-        * Implementor MUST return 0 bytes in the response body if no metadata is present
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the REPOSITORY:VIEW permission (see above)
+        * Endpoint MUST calculate and set the Digest header for every 2XX response
+        * Endpoint MUST return 200 with the metadata in the response body on success
+        * Endpoint MUST return 0 bytes in the response body if no metadata is present
       tags:
         - Repository
       responses:
@@ -138,13 +138,13 @@ paths:
     put:
       summary: Set repository metadata.
       description: |
-        * Implementor MUST Authenticate (see above)
-        * Implementor MUST Authorize, requiring the REPOSITORY:SET_METADATA permission (see above)
-        * Implementor MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
-        * Implementor MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
-        * Implementor MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 has of the request body
-        * Implementor MUST store the entire request body as the metadata
-        * Implementor MUST return 201 with an empty body on success
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the REPOSITORY:SET_METADATA permission (see above)
+        * Endpoint MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
+        * Endpoint MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
+        * Endpoint MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 has of the request body
+        * Endpoint MUST store the entire request body as the metadata
+        * Endpoint MUST return 201 with an empty body on success
       tags:
         - Repository
       parameters:
@@ -192,19 +192,19 @@ paths:
     get:
       summary: Get repository shards.
       description: |
-        * Implementor MUST Authenticate (see above)
-        * Implementor MUST Authorize, requiring the SHARD@[Shard ID]:VIEW permission for each shard returned (see above)
-        * Implementor MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA
-        * Implementor MUST return 400 with the MALFORMED_AFTER_PARAMETER code when the query parameter `after` is not blank and is not a uuid
-        * Implementor MUST return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer greater than 1
-        * Implementor MAY return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer less than a positive integer determined by the implementor
-        * Implementor MUST return 200 with an list of shards:
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the SHARD@[Shard ID]:VIEW permission for each shard returned (see above)
+        * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA
+        * Endpoint MUST return 400 with the MALFORMED_AFTER_PARAMETER code when the query parameter `after` is not blank and is not a uuid
+        * Endpoint MUST return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer greater than 1
+        * Endpoint MAY return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer less than a positive integer determined by the Endpoint
+        * Endpoint MUST return 200 with an list of shards:
             * in alphanumeric ascending order
             * starting after the value of the query parameter `after` (if set)
             * limited to the value of the query parameter `limit` (if set)
-        * Implementor MUST NOT return shards that the user does not have SHARD@[Shard ID]:VIEW access to
-        * Implementor MUST return shard metadata as a base64 encoded string only when the query parameter `include` contains METADATA
-        * Implementor MUST return an empty string if there is no shard metadata when returning shard metadata
+        * Endpoint MUST NOT return shards that the user does not have SHARD@[Shard ID]:VIEW access to
+        * Endpoint MUST return shard metadata as a base64 encoded string only when the query parameter `include` contains METADATA
+        * Endpoint MUST return an empty string if there is no shard metadata when returning shard metadata
       tags:
         - Shard
       parameters:
@@ -284,13 +284,13 @@ paths:
     post:
       summary: Create a repository shard.
       description: |
-        * Implementor MUST Authenticate (see above)
-        * Implementor MUST Authorize, requiring the SHARD:CREATE permission (see above)
-        * Implementor MUST return 400 with the MALFORMED_REQUEST_BODY code when the request body is not a valid JSON object
-        * Implementor MUST return 400 with the MALFORMED_METADATA_FIELD code when the metadata field is not an empty or base64 encoded string
-        * Implementor MUST generate a new uuid and assign it as the shard ID
-        * Implementor MUST return 200 with the newly created shard ID and base64 encoded metadata
-        * Implementor MUST return an empty string if there is no shard metadata
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the SHARD:CREATE permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_REQUEST_BODY code when the request body is not a valid JSON object
+        * Endpoint MUST return 400 with the MALFORMED_METADATA_FIELD code when the metadata field is not an empty or base64 encoded string
+        * Endpoint MUST generate a new uuid and assign it as the shard ID
+        * Endpoint MUST return 200 with the newly created shard ID and base64 encoded metadata
+        * Endpoint MUST return an empty string if there is no shard metadata
       tags:
         - Shard
       requestBody:
