@@ -202,8 +202,7 @@ paths:
             * in alphanumeric ascending order
             * starting after the value of the query parameter `after` (if set)
             * limited to the value of the query parameter `limit` (if set)
-            * that the caller has permissions to see (see Authorize sectio above)
-        * Implementor MUST NOT return shards that the user does not have TODO access to
+        * Implementor MUST NOT return shards that the user does not have SHARD@[Shard ID]:VIEW access to
         * Implementor MUST return shard metadata as a base64 encoded string only when the query parameter `include` contains METADATA
         * Implementor MUST return an empty string if there is no shard metadata when returning shard metadata
       tags:
@@ -908,7 +907,7 @@ components:
               code:
                 description: The error code.
                 type: string
-                enum: [TODO]
+                enum: [FORBIDDEN]
               description:
                 description: The error description.
                 type: string
