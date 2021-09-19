@@ -17,7 +17,45 @@ info:
     * MUST return 401 with the MALFORMED_JWT code when the trimmed JWT does not match /^[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+$/
     * MUST return 401 with the UNAUTHORIZED code when JWT Validation (see above) fails. TODO specify guidance on revealing which validation requirement failed
 
-    ### Authorization TODO
+    ### Authorization
+    Authorization (Permissions) is handled by a customizable role-based access control system (RBAC) that denies by default and explicitly allows actions to be taken on resources. Roles have metadata, associated users, and permissions. Users can belong to any number of roles. Permissions consist of a tuple specifying the resource and action. A resource consists of a resource type and (depending on the resource) a resource ID. `*` is a special case that may be used to denote "all available" of a aprticular resource, resource type, resource id, or action. Permissions are encoded using the following shorthand throughout the documentation: `RESOURCE_TYPE@RESOURCE_ID:ACTION` or `RESOURCE_TYPE:ACTION`. See permissions and examples table below.
+
+    Each endpoint that MUST Authorize:
+
+    * MUST return 403 with the FORBIDDEN code when the caller does not have at least 1 role that grants them the permission(s) specified for the endpoint
+    * MUST filter (as approrpiate) ALL sub-items and data that the caller does not have at least 1 role that grants the permission(s) specified for that sub-data in the endpoint
+
+    **Permissions**
+    |Resource Type|Resource ID|      Action      |Description|
+    |-------------|-----------|------------------|-----------|
+    | REPOSITORY  | N/A       | VIEW             | View repository data and statistics |
+    | REPOSITORY  | N/A       | SET_METADATA     | Set repository metadata |
+    | SHARD       | N/A       | CREATE           | Create shards and set initial metadata |
+    | SHARD       | Shard ID  | VIEW             | View shard metadata and statistics |
+    | SHARD       | Shard ID  | SET_METADATA     | Set shard metadata |
+    | SHARD       | Shard ID  | GET_COMMITS      | Get shard commits |
+    | SHARD       | Shard ID  | COMMIT           | Commit to a shard |
+    | SHARD       | Shard ID  | DELETE           | Delete a shard |
+    | USER        | N/A       | CREATE           | Create a user |
+    | USER        | User ID   | READ_METADATA    | View user metadata |
+    | USER        | User ID   | SET_METADATA     | Set user metadata |
+    | USER        | User ID   | MODIFY_KEYS      | Modify user keys |
+    | USER        | User ID   | READ_ROLE        | View user roles |
+    | USER        | User ID   | DELETE           | Delete user |
+    | ROLE        | N/A       | CREATE           | Create roles |
+    | ROLE        | Role ID   | READ_METADATA    | View role metadata |
+    | ROLE        | Role ID   | SET_METADATA     | Set role metadata |
+    | ROLE        | Role ID   | READ_USER        | View role users |
+    | ROLE        | Role ID   | MODIFY_USERS     | Modify role users |
+    | ROLE        | Role ID   | READ_PERMISSONS  | View role permissions |
+    | ROLE        | Role ID   | MODIFY_PERMISSONS| Modify role permissins |
+    | ROLE        | Role ID   | DELETE           | Delete role |
+
+    **Examples**
+    |Permission|Description|
+    |----------|-----------|
+    | `SHARD@*:VIEW` | View all shard metadata and statistics |
+    | `SHARD@1234:GET_COMMITS` | Get commits for shard 1234 |
 
     ### Errors
     Errors (non-2XX) MUST return with a `Content-Type: application/json` header and a response body in the following format: `{"code": "X_Y_Z", "description": "A b c"}`. The code MUST be a UPPER_SNAKE_CASE string and is part of the API contract. The description MUST be a string. The value of the description string is NOT part of the official API contract and is implementation specific.
@@ -36,8 +74,8 @@ tags:
     description: Shards and Commits
   - name: User
     description: Users and Keys
-  - name: Permission
-    description: Permissions Data
+  - name: Role
+    description: Roles and Permissions
 security:
   - BearerAuth: []
 paths:
@@ -71,7 +109,7 @@ paths:
       summary: Get repository metadata.
       description: |
         * Implementor MUST Authenticate (see above)
-        * Implementor MUST Authorize, requiring TODO permissions (see above)
+        * Implementor MUST Authorize, requiring the REPOSITORY:VIEW permission (see above)
         * Implementor MUST calculate and set the Digest header for every 2XX response
         * Implementor MUST return 200 with the metadata in the response body on success
         * Implementor MUST return 0 bytes in the response body if no metadata is present
@@ -101,7 +139,7 @@ paths:
       summary: Set repository metadata.
       description: |
         * Implementor MUST Authenticate (see above)
-        * Implementor MUST Authorize, requiring TODO permissions (see above)
+        * Implementor MUST Authorize, requiring the REPOSITORY:SET_METADATA permission (see above)
         * Implementor MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
         * Implementor MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
         * Implementor MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 has of the request body
@@ -155,7 +193,7 @@ paths:
       summary: Get repository shards.
       description: |
         * Implementor MUST Authenticate (see above)
-        * Implementor MUST Authorize, requiring TODO permissions (see above)
+        * Implementor MUST Authorize, requiring the SHARD@[Shard ID]:VIEW permission for each shard returned (see above)
         * Implementor MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA
         * Implementor MUST return 400 with the MALFORMED_AFTER_PARAMETER code when the query parameter `after` is not blank and is not a uuid
         * Implementor MUST return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer greater than 1
@@ -164,6 +202,7 @@ paths:
             * in alphanumeric ascending order
             * starting after the value of the query parameter `after` (if set)
             * limited to the value of the query parameter `limit` (if set)
+            * that the caller has permissions to see (see Authorize sectio above)
         * Implementor MUST NOT return shards that the user does not have TODO access to
         * Implementor MUST return shard metadata as a base64 encoded string only when the query parameter `include` contains METADATA
         * Implementor MUST return an empty string if there is no shard metadata when returning shard metadata
@@ -247,7 +286,7 @@ paths:
       summary: Create a repository shard.
       description: |
         * Implementor MUST Authenticate (see above)
-        * Implementor MUST Authorize, requiring TODO permissions (see above)
+        * Implementor MUST Authorize, requiring the SHARD:CREATE permission (see above)
         * Implementor MUST return 400 with the MALFORMED_REQUEST_BODY code when the request body is not a valid JSON object
         * Implementor MUST return 400 with the MALFORMED_METADATA_FIELD code when the metadata field is not an empty or base64 encoded string
         * Implementor MUST generate a new uuid and assign it as the shard ID
@@ -309,14 +348,14 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalError'
-  /v1/shard/{id}:
+  /v1/shard/{shardId}:
     get:
       summary: Get shard data.
       description: Get shard data.
       tags:
         - Shard
       parameters:
-        - name: id
+        - name: shardId
           in: path
           description: Shard ID
           required: true
@@ -344,7 +383,7 @@ paths:
       tags:
         - Shard
       parameters:
-        - name: id
+        - name: shardId
           in: path
           description: Shard ID
           required: true
@@ -354,14 +393,30 @@ paths:
       responses:
         '200':
           description: Shard data.
-  /v1/shard/{id}/metadata:
+    delete:
+      summary: Delete a shard with a particular ID.
+      description: Delete shard.
+      tags:
+        - Shard
+      parameters:
+        - name: shardId
+          in: path
+          description: Shard ID
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Shard deleted.
+  /v1/shard/{shardId}/metadata:
     get:
       summary: Get shard metadata.
       description: Get shard metadata.
       tags:
         - Shard
       parameters:
-        - name: id
+        - name: shardId
           in: path
           description: Shard ID
           required: true
@@ -377,7 +432,7 @@ paths:
       tags:
         - Shard
       parameters:
-        - name: id
+        - name: shardId
           in: path
           description: Shard ID
           required: true
@@ -387,14 +442,14 @@ paths:
       responses:
         '201':
           description: Shard metadata set.
-  /v1/shard/{id}/commit:
+  /v1/shard/{shardId}/commit:
     get:
       summary: Get shard commits.
       description: Get shard commits.
       tags:
         - Shard
       parameters:
-        - name: id
+        - name: shardId
           in: path
           description: Shard ID
           required: true
@@ -410,7 +465,7 @@ paths:
       tags:
         - Shard
       parameters:
-        - name: id
+        - name: shardId
           in: path
           description: Shard ID
           required: true
@@ -420,14 +475,14 @@ paths:
       responses:
         '201':
           description: Shard commit created.
-  /v1/shard/{id}/commit/{number}:
+  /v1/shard/{shardId}/commit/{number}:
     get:
       summary: Get shard commit.
       description: Get shard commit.
       tags:
         - Shard
       parameters:
-        - name: id
+        - name: shardId
           in: path
           description: Shard ID
           required: true
@@ -450,7 +505,7 @@ paths:
       tags:
         - Shard
       parameters:
-        - name: id
+        - name: shardId
           in: path
           description: Shard ID
           required: true
@@ -477,14 +532,14 @@ paths:
       responses:
         '201':
           description: Repository user created.
-  /v1/user/{id}:
+  /v1/user/{userId}:
     get:
       summary: Get user data.
       description: Get user data.
       tags:
         - User
       parameters:
-        - name: id
+        - name: userId
           in: path
           description: User ID
           required: true
@@ -494,14 +549,30 @@ paths:
       responses:
         '200':
           description: User data.
-  /v1/user/{id}/metadata:
+    delete:
+      summary: Delete a user.
+      description: Delete user.
+      tags:
+        - User
+      parameters:
+        - name: userId
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '204':
+          description: User deleted.
+  /v1/user/{userId}/metadata:
     get:
       summary: Get user metadata.
       description: Get user metadata.
       tags:
         - User
       parameters:
-        - name: id
+        - name: userId
           in: path
           description: User ID
           required: true
@@ -517,7 +588,7 @@ paths:
       tags:
         - User
       parameters:
-        - name: id
+        - name: userId
           in: path
           description: User ID
           required: true
@@ -527,14 +598,14 @@ paths:
       responses:
         '201':
           description: User metadata set.
-  /v1/user/{id}/key:
+  /v1/user/{userId}/key:
     get:
       summary: Get user keys.
       description: Get user keys.
       tags:
         - User
       parameters:
-        - name: id
+        - name: userId
           in: path
           description: User ID
           required: true
@@ -550,7 +621,7 @@ paths:
       tags:
         - User
       parameters:
-        - name: id
+        - name: userId
           in: path
           description: User ID
           required: true
@@ -560,14 +631,14 @@ paths:
       responses:
         '201':
           description: User key added.
-  /v1/user/{id}/key/{key}:
+  /v1/user/{userId}/key/{key}:
     get:
       summary: Get user key.
       description: Get user key.
       tags:
         - User
       parameters:
-        - name: id
+        - name: userId
           in: path
           description: User ID
           required: true
@@ -590,7 +661,7 @@ paths:
       tags:
         - User
       parameters:
-        - name: id
+        - name: userId
           in: path
           description: User ID
           required: true
@@ -607,52 +678,202 @@ paths:
       responses:
         '204':
           description: User key removed.
-  /v1/permission:
+  /v1/role:
     get:
-      summary: Get repository permissions.
-      description: Get repository permissions.
+      summary: Get role data.
+      description: Get role data.
       tags:
-        - Permission
+        - Role
       responses:
         '200':
-          description: Repository permissions.
+          description: Role data.
     post:
-      summary: Set repository permissions.
-      description: Set repository permissions.
+      summary: Create role.
+      description: Create role.
       tags:
-        - Permission
+        - Role
       responses:
         '201':
-          description: Set Repository permissions. TODO user, resource type, resource id, permission
-  /v1/permission/{user}/{resource}/{permission}:
-    delete:
-      summary: Remove permission.
-      description: Remove permission.
+          description: Create role.
+  /v1/role/{roleId}:
+    get:
+      summary: Get role data.
+      description: Get role data.
       tags:
-        - Permission
+        - Role
       parameters:
-        - name: user
+        - name: roleId
+          in: path
+          description: Role ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: Role data.
+    delete:
+      summary: Delete role.
+      description: Delete role.
+      tags:
+        - Role
+      parameters:
+        - name: roleId
+          in: path
+          description: Role ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: Role data.
+  /v1/role/{roleId}/metadata:
+    get:
+      summary: Get role metadata.
+      description: Get role metadata.
+      tags:
+        - Role
+      parameters:
+        - name: roleId
+          in: path
+          description: Role ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: Role metadata.
+    put:
+      summary: Set role metadata.
+      description: Set role metadata.
+      tags:
+        - Role
+      parameters:
+        - name: roleId
+          in: path
+          description: Role ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: Role metadata set.
+  /v1/role/{roleId}/user:
+    get:
+      summary: Get role users.
+      description: Get role users.
+      tags:
+        - Role
+      parameters:
+        - name: roleId
+          in: path
+          description: Role ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '200':
+          description: Role users.
+    post:
+      summary: Add user to role.
+      description: Add user to role.
+      tags:
+        - Role
+      parameters:
+        - name: roleId
+          in: path
+          description: Role ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: Role user added.
+  /v1/role/{roleId}/user/{userId}:
+    delete:
+      summary: Remove user from role.
+      description: Remove user from role.
+      tags:
+        - Role
+      parameters:
+        - name: roleId
+          in: path
+          description: Role ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: userId
           in: path
           description: User ID
           required: true
           schema:
             type: string
             format: uuidv4
-        - name: resource
+      responses:
+        '204':
+          description: User removed.
+  /v1/role/{roleId}/permission:
+    get:
+      summary: Get role permissions.
+      description: Get role permissions.
+      tags:
+        - Role
+      parameters:
+        - name: roleId
           in: path
-          description: Resource ID
+          description: Role ID
           required: true
           schema:
             type: string
-        - name: permission
+            format: uuidv4
+      responses:
+        '200':
+          description: Role permissions.
+    post:
+      summary: Add permission to role.
+      description: Add permission to role.
+      tags:
+        - Role
+      parameters:
+        - name: roleId
           in: path
-          description: Permission
+          description: Role ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+      responses:
+        '201':
+          description: Role permission added.
+  /v1/role/{roleId}/permission/{permissionId}:
+    delete:
+      summary: Remove permission from role.
+      description: Remove permission from role.
+      tags:
+        - Role
+      parameters:
+        - name: roleId
+          in: path
+          description: Role ID
+          required: true
+          schema:
+            type: string
+            format: uuidv4
+        - name: permissionId
+          in: path
+          description: Permission ID
           required: true
           schema:
             type: string
       responses:
         '204':
-          description: Permission removed.
+          description: Role permission removed.
 components:
   securitySchemes:
     BearerAuth:
