@@ -18,7 +18,7 @@ info:
     * MUST return 401 with the UNAUTHORIZED code when JWT Validation (see above) fails. TODO specify guidance on revealing which validation requirement failed
 
     ### Authorization
-    Authorization (Permissions) is handled by a customizable role-based access control system (RBAC) that denies by default and explicitly allows actions to be taken on resources. Roles have metadata, associated users, and permissions. Users can belong to any number of roles. Permissions consist of a tuple specifying the resource and action. A resource consists of a resource type and (depending on the resource) a resource ID. `*` is a special case that may be used to denote "all available" of a aprticular resource, resource type, resource id, or action. Permissions are encoded using the following shorthand throughout the documentation: `RESOURCE_TYPE@RESOURCE_ID:ACTION` or `RESOURCE_TYPE:ACTION`. See permissions and examples table below.
+    Authorization (Permissions) is handled by a customizable role-based access control system (RBAC) that denies by default and explicitly allows actions to be taken on resources. Roles have metadata, associated users, and permissions. Users can belong to any number of roles. Permissions consist of a tuple specifying the resource and action. A resource consists of a resource type and (depending on the resource) a resource ID. `*` is a special case that may be used to denote "all available" of a particular resource, resource type, resource id, or action. Permissions are encoded using the following shorthand throughout the documentation: `RESOURCE_TYPE@RESOURCE_ID:ACTION` or `RESOURCE_TYPE:ACTION`. See permissions and examples table below.
 
     Each endpoint that MUST Authorize:
 
