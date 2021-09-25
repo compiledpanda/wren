@@ -683,9 +683,48 @@ paths:
       description: Get role data.
       tags:
         - Role
+      parameters:
+        - name: include
+          in: query
+          description: Additional information to include
+          required: false
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [METADATA, USERS, PERMISSIONS]
+            default: ''
+        - name: after
+          in: query
+          description: Retrieve roles after this one
+          required: false
+          schema:
+            type: string
+            format: uuid
+            default: ''
+        - name: limit
+          in: query
+          description: Maximum number of roles to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
       responses:
         '200':
           description: Role data.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    description: Role data.
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RoleResponse'
     post:
       summary: Create role.
       description: Create role.
@@ -693,7 +732,11 @@ paths:
         - Role
       responses:
         '201':
-          description: Create role.
+          description: Role created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
   /v1/role/{roleId}:
     get:
       summary: Get role data.
@@ -711,6 +754,10 @@ paths:
       responses:
         '200':
           description: Role data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
     delete:
       summary: Delete role.
       description: Delete role.
@@ -929,3 +976,57 @@ components:
                 type: string
                 example: Helpful feedback for the developer.
             required: [code, description]
+  schemas:
+    RoleResponse:
+      type: object
+      properties:
+        id:
+          description: The role id.
+          type: string
+          format: uuid
+        metadata:
+          description: The role metadata (base64 encoded).
+          type: string
+          format: base64
+          example: QXY...
+        users:
+          description: The role's users.
+          type: array
+          items:
+            description: User id.
+            type: string
+            format: uuid
+        permissions:
+          description: The role's permissions
+          type: array
+          items:
+            description: Permission
+            $ref: '#/components/schemas/PermissionResponse'
+      required: [id, metadata, users, permissions]
+    PermissionResponse:
+      type: object
+      properties:
+        id:
+          description: The permission id. The value is implementation Specific
+          type: string
+          example: Opaque Value
+        resource:
+          description: The permission resource. Note that id is conditionally required depending on the type and action.
+          type: object
+          properties:
+            type:
+              description: The resource type
+              type: string
+              enum: [REPOSITORY, SHARD, USER, ROLE, '*']
+              example: SHARD
+            id:
+              description: The resource id
+              type: string
+              example: '*'
+          required: [type]
+        action:
+          description: The permission action. Note that the value depends on the resource
+          type: string
+          example: VIEW
+      required: [id, resource, action]
+
