@@ -24,6 +24,7 @@ info:
 
     * MUST return 403 with the FORBIDDEN code when the caller does not have at least 1 role that grants them the permission(s) specified for the endpoint
     * MUST filter (as approrpiate) ALL sub-items and data that the caller does not have at least 1 role that grants the permission(s) specified for that sub-data in the endpoint
+    * MUST authorize independent of the existence of the resources behind the permissions. This means that if a request to modify resource X occurs and resource X does not exist, the endpoint MUST return 403 if there is insufficient permissions to perform the requested actions.
 
     **Permissions**
     |Resource Type|Resource ID|      Action      |Description|
@@ -31,25 +32,25 @@ info:
     | REPOSITORY  | N/A       | VIEW             | View repository data and statistics |
     | REPOSITORY  | N/A       | SET_METADATA     | Set repository metadata |
     | SHARD       | N/A       | CREATE           | Create shards and set initial metadata |
-    | SHARD       | Shard ID  | VIEW             | View shard metadata and statistics |
-    | SHARD       | Shard ID  | SET_METADATA     | Set shard metadata |
-    | SHARD       | Shard ID  | GET_COMMITS      | Get shard commits |
-    | SHARD       | Shard ID  | COMMIT           | Commit to a shard |
-    | SHARD       | Shard ID  | DELETE           | Delete a shard |
+    | SHARD       | SHARD_ID  | VIEW             | View shard metadata and statistics |
+    | SHARD       | SHARD_ID  | SET_METADATA     | Set shard metadata |
+    | SHARD       | SHARD_ID  | GET_COMMITS      | Get shard commits |
+    | SHARD       | SHARD_ID  | COMMIT           | Commit to a shard |
+    | SHARD       | SHARD_ID  | DELETE           | Delete a shard |
     | USER        | N/A       | CREATE           | Create a user |
-    | USER        | User ID   | READ_METADATA    | View user metadata |
-    | USER        | User ID   | SET_METADATA     | Set user metadata |
-    | USER        | User ID   | MODIFY_KEYS      | Modify user keys |
-    | USER        | User ID   | READ_ROLE        | View user roles |
-    | USER        | User ID   | DELETE           | Delete user |
+    | USER        | USER_ID   | READ_METADATA    | View user metadata |
+    | USER        | USER_ID   | SET_METADATA     | Set user metadata |
+    | USER        | USER_ID   | MODIFY_KEYS      | Modify user keys |
+    | USER        | USER_ID   | READ_ROLE        | View user roles |
+    | USER        | USER_ID   | DELETE           | Delete user |
     | ROLE        | N/A       | CREATE           | Create roles |
-    | ROLE        | Role ID   | READ_METADATA    | View role metadata |
-    | ROLE        | Role ID   | SET_METADATA     | Set role metadata |
-    | ROLE        | Role ID   | READ_USER        | View role users |
-    | ROLE        | Role ID   | MODIFY_USERS     | Modify role users |
-    | ROLE        | Role ID   | READ_PERMISSONS  | View role permissions |
-    | ROLE        | Role ID   | MODIFY_PERMISSONS| Modify role permissins |
-    | ROLE        | Role ID   | DELETE           | Delete role |
+    | ROLE        | ROLE_ID   | READ_METADATA    | View role metadata |
+    | ROLE        | ROLE_ID   | SET_METADATA     | Set role metadata |
+    | ROLE        | ROLE_ID   | READ_USER        | View role users |
+    | ROLE        | ROLE_ID   | MODIFY_USERS     | Modify role users |
+    | ROLE        | ROLE_ID   | READ_PERMISSONS  | View role permissions |
+    | ROLE        | ROLE_ID   | MODIFY_PERMISSONS| Modify role permissins |
+    | ROLE        | ROLE_ID   | DELETE           | Delete role |
 
     **Examples**
     |Permission|Description|
@@ -900,7 +901,15 @@ paths:
   /v1/role/{roleId}/permission/{permissionId}:
     delete:
       summary: Remove permission from role.
-      description: Remove permission from role.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:MODIFY_PERMISSONS permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
+        * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
+        * Endpoint MAY return 400 with the MALFORMED_PERMISSON_ID code when the path parameter `permissionId` is not a uuid
+        * Endpoint MAY return 404 with the PERMISSON_NOT_FOUND code when the permission is not found
+        * Endpoint MUST remove the specified permission from the specified role
+        * Endpoint MAY be idempotent and MAY not error if the specified permission is not currently associated with the specified role
       tags:
         - Role
       parameters:
@@ -910,7 +919,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
         - name: permissionId
           in: path
           description: Permission ID
@@ -919,7 +928,45 @@ paths:
             type: string
       responses:
         '204':
-          description: Role permission removed.
+          description: Role permission removed. No response body returned.
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_ROLE_ID, MALFORMED_PERMISSON_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [ROLE_NOT_FOUND, PERMISSON_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   securitySchemes:
     BearerAuth:
