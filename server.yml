@@ -65,7 +65,7 @@ info:
 
     Method Not Allowed errors MAY be caught and MUST return a 405 with the METHOD_NOT_ALLOWED code. The description may contain a secure description of the error.
 
-    Other Implementation Errors MAY be generated and MUST follow the error format described above. For example, a throttled response MAY generate a 429 with a properly formatted error body. These additional errors SHOULD be documented as a part of the implementation documenttaion.
+    Other Implementation Errors MAY be generated and MUST follow the error format described above. For example, a throttled response MAY generate a 429 with a properly formatted error body. These additional errors SHOULD be documented as a part of the implementation documentation.
 servers:
   - url: http://localhost:8985
 tags:
@@ -906,7 +906,7 @@ paths:
         * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:MODIFY_PERMISSONS permission (see above)
         * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
         * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
-        * Endpoint MAY return 400 with the MALFORMED_PERMISSON_ID code when the path parameter `permissionId` is not a uuid
+        * Endpoint MAY return 400 with the MALFORMED_PERMISSON_ID code when the path parameter `permissionId` is malformed
         * Endpoint MAY return 404 with the PERMISSON_NOT_FOUND code when the permission is not found
         * Endpoint MUST remove the specified permission from the specified role
         * Endpoint MAY be idempotent and MAY not error if the specified permission is not currently associated with the specified role
