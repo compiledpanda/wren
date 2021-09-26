@@ -884,7 +884,19 @@ paths:
           description: Role permissions.
     post:
       summary: Add permission to role.
-      description: Add permission to role.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:MODIFY_PERMISSONS permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
+        * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
+        * Endpoint MUST return 400 with the MALFORMED_REQUEST_BODY code when the request body is not a valid JSON object
+        * Endpoint MUST return 400 with the MALFORMED_RESOURCE_FIELD code when the resource field is not a valid JSON object
+        * Endpoint MUST return 400 with the MALFORMED_RESOURCE_TYPE_FIELD code when the resource type field is not a valid string
+        * Endpoint MUST return 400 with the MALFORMED_RESOURCE_ID_FIELD code when the resource id field is not a valid string (see permissions above)
+        * Endpoint MUST return 400 with the MALFORMED_ACTION_FIELD code when the action field is not a valid string (see permissions above)
+        * Endpoint MUST generate a new id and assign it as the permission ID
+        * Endpoint MUST add the specified permission to the specified role
+        * Endpoint MUST return the newly associated permission from the specified role
       tags:
         - Role
       parameters:
@@ -894,10 +906,79 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
+      requestBody:
+        description: Permission data
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resource:
+                  description: The permission resource. Note that id is conditionally required depending on the type and action.
+                  type: object
+                  properties:
+                    type:
+                      description: The resource type
+                      type: string
+                      enum: [REPOSITORY, SHARD, USER, ROLE, '*']
+                      example: SHARD
+                    id:
+                      description: The resource id
+                      type: string
+                      example: '*'
+                  required: [type]
+                action:
+                  description: The permission action. Note that the value depends on the resource
+                  type: string
+                  example: VIEW
+              required: [resource, action]
       responses:
         '201':
           description: Role permission added.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionResponse'
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_ROLE_ID, MALFORMED_REQUEST_BODY, MALFORMED_RESOURCE_FIELD, MALFORMED_RESOURCE_TYPE_FIELD, MALFORMED_RESOURCE_ID_FIELD, MALFORMED_ACTION_FIELD]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [ROLE_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/role/{roleId}/permission/{permissionId}:
     delete:
       summary: Remove permission from role.
