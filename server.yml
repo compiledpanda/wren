@@ -48,7 +48,7 @@ info:
     | ROLE        | ROLE_ID   | SET_METADATA     | Set role metadata |
     | ROLE        | ROLE_ID   | READ_USER        | View role users |
     | ROLE        | ROLE_ID   | MODIFY_USERS     | Modify role users |
-    | ROLE        | ROLE_ID   | READ_PERMISSONS  | View role permissions |
+    | ROLE        | ROLE_ID   | VIEW_PERMISSONS  | View role permissions |
     | ROLE        | ROLE_ID   | MODIFY_PERMISSONS| Modify role permissins |
     | ROLE        | ROLE_ID   | DELETE           | Delete role |
 
@@ -868,7 +868,13 @@ paths:
   /v1/role/{roleId}/permission:
     get:
       summary: Get role permissions.
-      description: Get role permissions.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:VIEW_PERMISSONS permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
+        * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
+        * Endpoint MUST return all permissions from the specified role
+        * Endpoint MAY return all permissions from the specified role in a sorted order
       tags:
         - Role
       parameters:
@@ -878,10 +884,59 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: Role permissions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    description: Shard data.
+                    type: array
+                    items:
+                      description: Permissions
+                      $ref: '#/components/schemas/PermissionResponse'
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_ROLE_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [ROLE_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
       summary: Add permission to role.
       description: |
