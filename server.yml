@@ -8,7 +8,7 @@ info:
     ### Authentication
     Authentication (Identity) is provided by sending a signed JWT via the Authorization header (Authorization: Bearer <jwt>). The JWT header MUST contain `alg` (the algorithm used to sign) and `typ` (JWT). The payload MUST contain `iat` (issued at time in unix epoch seconds), `exp` (expiration time in unix epoch seconds), and `sub` (user id). The JWT signature MUST be signed utilizing either RS256 OR ES256 and a private key associated with the subject (user).
 
-    JWT Validation requires that: 1) header.alg MUST be an approved signature type, 2) header.typ must be JWT, 3) payload.iat MUST be a number and < now, 4) payload.exp MUST be a number and > now, 5) payload.sub MUST be a uuidv4 string, 6) signature MUST be valid for a key associated with payload.sub.
+    JWT Validation requires that: 1) header.alg MUST be an approved signature type, 2) header.typ must be JWT, 3) payload.iat MUST be a number and < now, 4) payload.exp MUST be a number and > now, 5) payload.sub MUST be a uuid string, 6) signature MUST be valid for a key associated with payload.sub.
 
     Each endpoint that MUST Authenticate:
         
@@ -545,7 +545,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: User data.
@@ -561,7 +561,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '204':
           description: User deleted.
@@ -578,7 +578,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: User metadata.
@@ -594,7 +594,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '201':
           description: User metadata set.
@@ -611,7 +611,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: User keys.
@@ -627,7 +627,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '201':
           description: User key added.
@@ -644,7 +644,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
         - name: key
           in: path
           description: Key ID
@@ -667,7 +667,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
         - name: key
           in: path
           description: Key ID
@@ -751,7 +751,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: Role data.
@@ -771,7 +771,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: Role data.
@@ -788,7 +788,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: Role metadata.
@@ -804,7 +804,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '201':
           description: Role metadata set.
@@ -821,13 +821,21 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: Role users.
     post:
-      summary: Add user to role.
-      description: Add user to role.
+      summary: Add user(s) to role.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:MODIFY_USERS permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
+        * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
+        * Endpoint MUST return 400 with the MALFORMED_USER_ID code when a user id in the request body is malformed
+        * Endpoint MUST return 404 with the USER_NOT_FOUND code when a user id in the request body is not found
+        * Endpoint MUST add the specified user(s) to the specified role
+        * Endpoint MAY be idempotent and MAY not error if the specified user is currently associated with the specified role
       tags:
         - Role
       parameters:
@@ -837,10 +845,63 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
+      requestBody:
+        description: User(s)
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                users:
+                  description: The user id
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+              required: [users]
       responses:
         '201':
-          description: Role user added.
+          description: User(s) added to role. No response body returned.
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_ROLE_ID, MALFORMED_USER_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [ROLE_NOT_FOUND, USER_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/role/{roleId}/user/{userId}:
     delete:
       summary: Remove user from role.
@@ -862,14 +923,14 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
         - name: userId
           in: path
           description: User ID
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '204':
           description: Role user removed. No response body returned.
@@ -930,7 +991,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       responses:
         '200':
           description: Role permissions.
@@ -1007,7 +1068,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
       requestBody:
         description: Permission data
         required: true
@@ -1101,7 +1162,7 @@ paths:
           required: true
           schema:
             type: string
-            format: uuidv4
+            format: uuid
         - name: permissionId
           in: path
           description: Permission ID
