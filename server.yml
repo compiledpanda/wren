@@ -38,15 +38,15 @@ info:
     | SHARD       | SHARD_ID  | COMMIT           | Commit to a shard |
     | SHARD       | SHARD_ID  | DELETE           | Delete a shard |
     | USER        | N/A       | CREATE           | Create a user |
-    | USER        | USER_ID   | READ_METADATA    | View user metadata |
+    | USER        | USER_ID   | VIEW_METADATA    | View user metadata |
     | USER        | USER_ID   | SET_METADATA     | Set user metadata |
     | USER        | USER_ID   | MODIFY_KEYS      | Modify user keys |
-    | USER        | USER_ID   | READ_ROLE        | View user roles |
+    | USER        | USER_ID   | VIEW_ROLE        | View user roles |
     | USER        | USER_ID   | DELETE           | Delete user |
     | ROLE        | N/A       | CREATE           | Create roles |
-    | ROLE        | ROLE_ID   | READ_METADATA    | View role metadata |
+    | ROLE        | ROLE_ID   | VIEW_METADATA    | View role metadata |
     | ROLE        | ROLE_ID   | SET_METADATA     | Set role metadata |
-    | ROLE        | ROLE_ID   | READ_USER        | View role users |
+    | ROLE        | ROLE_ID   | VIEW_USERS       | View role users |
     | ROLE        | ROLE_ID   | MODIFY_USERS     | Modify role users |
     | ROLE        | ROLE_ID   | VIEW_PERMISSONS  | View role permissions |
     | ROLE        | ROLE_ID   | MODIFY_PERMISSONS| Modify role permissins |
@@ -774,11 +774,18 @@ paths:
             format: uuid
       responses:
         '200':
-          description: Role data.
+          description: Role removed (there is no response body).
   /v1/role/{roleId}/metadata:
     get:
       summary: Get role metadata.
-      description: Get role metadata.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:VIEW_METADATA permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
+        * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
+        * Endpoint MUST calculate and set the Digest header for every 2XX response
+        * Endpoint MUST return 200 with the metadata in the response body on success
+        * Endpoint MUST return 0 bytes in the response body if no metadata is present
       tags:
         - Role
       parameters:
@@ -792,9 +799,67 @@ paths:
       responses:
         '200':
           description: Role metadata.
+          headers:
+            Digest:
+              description: A SHA-256 has of the response body
+              schema:
+                type: string
+                example: sha-256=YTU......
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_ROLE_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [ROLE_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
     put:
       summary: Set role metadata.
-      description: Set role metadata.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:SET_METADATA permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
+        * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
+        * Endpoint MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
+        * Endpoint MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
+        * Endpoint MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 has of the request body
+        * Endpoint MUST store the entire request body as the role metadata
+        * Endpoint MUST return 201 with an empty body on success
       tags:
         - Role
       parameters:
@@ -805,13 +870,72 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: Digest
+          in: header
+          description: The SHA-256 hash of the request body.
+          required: true
+          schema:
+            type: string
+            example: sha-256=YTU......
+      requestBody:
+        description: Binary metadata
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
       responses:
         '201':
-          description: Role metadata set.
+          description: Role metadata set (there is no response body).
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_ROLE_ID, MISSING_DIGEST_HEADER, MALFORMED_DIGEST_HEADER, DIGEST_BODY_MISMATCH]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [ROLE_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/role/{roleId}/user:
     get:
       summary: Get role users.
-      description: Get role users.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:VIEW_USERS permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
+        * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
+        * Endpoint MUST return 200 with all users from the specified roles
+        * Endpoint MAY return all users from the specified role in a sorted order
       tags:
         - Role
       parameters:
@@ -825,6 +949,60 @@ paths:
       responses:
         '200':
           description: Role users.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    description: Shard data.
+                    type: array
+                    items:
+                      description: Permissions
+                      type: object
+                      properties:
+                        id:
+                          description: The user id.
+                          type: string
+                          format: uuid
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_ROLE_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [ROLE_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
       summary: Add user(s) to role.
       description: |
@@ -835,6 +1013,7 @@ paths:
         * Endpoint MUST return 400 with the MALFORMED_USER_ID code when a user id in the request body is malformed
         * Endpoint MUST return 404 with the USER_NOT_FOUND code when a user id in the request body is not found
         * Endpoint MUST add the specified user(s) to the specified role
+        * Endpoint MUST return 201 with an empty body on success
         * Endpoint MAY be idempotent and MAY not error if the specified user is currently associated with the specified role
       tags:
         - Role
@@ -913,6 +1092,7 @@ paths:
         * Endpoint MAY return 400 with the MALFORMED_USER_ID code when the path parameter `userId` is malformed
         * Endpoint MAY return 404 with the USER_NOT_FOUND code when the permission is not found
         * Endpoint MUST remove the specified user from the specified role
+        * Endpoint MUST return 204 with an empty body on success
         * Endpoint MAY be idempotent and MAY not error if the specified user is not currently associated with the specified role
       tags:
         - Role
@@ -980,7 +1160,7 @@ paths:
         * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:VIEW_PERMISSONS permission (see above)
         * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
         * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
-        * Endpoint MUST return all permissions from the specified role
+        * Endpoint MUST return 200 with all permissions from the specified role
         * Endpoint MAY return all permissions from the specified role in a sorted order
       tags:
         - Role
@@ -1058,7 +1238,7 @@ paths:
         * Endpoint MUST return 400 with the MALFORMED_ACTION_FIELD code when the action field is not a valid string (see permissions above)
         * Endpoint MUST generate a new id and assign it as the permission ID
         * Endpoint MUST add the specified permission to the specified role
-        * Endpoint MUST return the newly associated permission from the specified role
+        * Endpoint MUST return 200 with the newly associated permission from the specified role
       tags:
         - Role
       parameters:
@@ -1152,6 +1332,7 @@ paths:
         * Endpoint MAY return 400 with the MALFORMED_PERMISSON_ID code when the path parameter `permissionId` is malformed
         * Endpoint MAY return 404 with the PERMISSON_NOT_FOUND code when the permission is not found
         * Endpoint MUST remove the specified permission from the specified role
+        * Endpoint MUST return 204 with an empty body on success
         * Endpoint MAY be idempotent and MAY not error if the specified permission is not currently associated with the specified role
       tags:
         - Role
