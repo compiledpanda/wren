@@ -290,7 +290,7 @@ paths:
         * Endpoint MUST return 400 with the MALFORMED_REQUEST_BODY code when the request body is not a valid JSON object
         * Endpoint MUST return 400 with the MALFORMED_METADATA_FIELD code when the metadata field is not an empty or base64 encoded string
         * Endpoint MUST generate a new uuid and assign it as the shard ID
-        * Endpoint MUST return 200 with the newly created shard ID and base64 encoded metadata
+        * Endpoint MUST return 201 with the newly created shard ID and base64 encoded metadata
         * Endpoint MUST return an empty string if there is no shard metadata
       tags:
         - Shard
@@ -681,7 +681,25 @@ paths:
   /v1/role:
     get:
       summary: Get role data.
-      description: Get role data.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:VIEW permission for each role returned (see above)
+        * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA, USERS, PERMISSIONS
+        * Endpoint MUST return 400 with the MALFORMED_AFTER_PARAMETER code when the query parameter `after` is not blank and is not a uuid
+        * Endpoint MUST return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer greater than 1
+        * Endpoint MAY return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer less than a positive integer determined by the Endpoint
+        * Endpoint MUST return 200 with an list of roles:
+            * in alphanumeric ascending order
+            * starting after the value of the query parameter `after` (if set)
+            * limited to the value of the query parameter `limit` (if set)
+        * Endpoint MUST NOT return roles that the user does not have ROLE@ROLE_ID:VIEW access to
+        * Endpoint MUST return the metadata field as a base64 encoded string (or blank string if empty) only when the `include` parameter includes METADATA (the field is omitted otherwise)
+        * Endpoint MUST return the users field only when the `include` parameter includes USERS (the field is omitted otherwise)
+        * Endpoint MUST return null for the users field when the `include` parameter includes USERS and the user does not have the ROLE@ROLE_ID:VIEW_USERS permission for that role
+        * Endpoint MAY return users from the specified role in a sorted order
+        * Endpoint MUST return the permissions field only when the `include` parameter includes PERMISSIONS (the field is omitted otherwise)
+        * Endpoint MUST return null for the permissions field when the `include` parameter includes PERMISSIONS and the user does not have the ROLE@ROLE_ID:VIEW_PERMISSONS permission for that role
+        * Endpoint MAY return permissions from the specified role in a sorted order
       tags:
         - Role
       parameters:
@@ -726,14 +744,95 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/RoleResponse'
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_INCLUDE_PARAMETER, MALFORMED_AFTER_PARAMETER, MALFORMED_LIMIT_PARAMETER]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
       summary: Create role.
-      description: Create role.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the ROLE:CREATE permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_REQUEST_BODY code when the request body is not a valid JSON object
+        * Endpoint MUST return 400 with the MALFORMED_METADATA_FIELD code when the metadata field is not an empty or base64 encoded string
+        * Endpoint MUST generate a new uuid and assign it as the role ID
+        * Endpoint MUST add the role and metadata under the new ID
+        * Endpoint MUST return 201 with the newly created role ID and base64 encoded metadata
+        * Endpoint MUST return an empty string if there is no role metadata
       tags:
         - Role
+      requestBody:
+        description: Role data
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                metadata:
+                  description: Role metadata (base64 encoded string), or an empty string if there is no role metadata.
+                  type: string
+                  format: base64
+                  example: QXY...
+              required: [metadata]
       responses:
         '201':
           description: Role created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    description: The role id.
+                    type: string
+                    format: uuid
+                  metadata:
+                    description: The role metadata (base64 encoded).
+                    type: string
+                    format: base64
+                    example: QXY...
+                required: [id, metadata]
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_REQUEST_BODY, MALFORMED_METADATA_FIELD]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/role/{roleId}:
     get:
       summary: Get role data.
@@ -743,13 +842,13 @@ paths:
         * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
         * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
         * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA, USERS, PERMISSIONS
-        * Endpoint MUST return 403 with the USERS_FORBIDDEN code when the `include` parameter includes USERS and the user does not have the ROLE@ROLE_ID:VIEW_USERS permission
-        * Endpoint MUST return 403 with the PERMISSONS_FORBIDDEN code when the `include` parameter includes PERMISSIONS and the user does not have the ROLE@ROLE_ID:VIEW_PERMISSONS permission
         * Endpoint MUST return 200 with the id field on success
         * Endpoint MUST return the metadata field as a base64 encoded string (or blank string if empty) only when the `include` parameter includes METADATA (the field is omitted otherwise)
-        * Endpoint MUST return the users field only when the `include` parameter includes USERS (the field is omitted otherwise)
+        * Endpoint MUST return the users field when the `include` parameter includes USERS (the field is omitted otherwise)
+        * Endpoint MUST return null for the users field when the `include` parameter includes USERS and the user does not have the ROLE@ROLE_ID:VIEW_USERS permission
         * Endpoint MAY return users from the specified role in a sorted order
-        * Endpoint MUST return the permissions field only when the `include` parameter includes PERMISSIONS (the field is omitted otherwise)
+        * Endpoint MUST return the permissions field when the `include` parameter includes PERMISSIONS (the field is omitted otherwise)
+        * Endpoint MUST return null for the permissions field when the `include` parameter includes PERMISSIONS and the user does not have the ROLE@ROLE_ID:VIEW_PERMISSONS permission
         * Endpoint MAY return permissions from the specified role in a sorted order
       tags:
         - Role
@@ -799,21 +898,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  code:
-                    description: The error code.
-                    type: string
-                    enum: [FORBIDDEN, USERS_FORBIDDEN, PERMISSONS_FORBIDDEN]
-                  description:
-                    description: The error description.
-                    type: string
-                    example: Helpful feedback for the developer.
-                required: [code, description]
+          $ref: '#/components/responses/Forbidden'
         '404':
           description: Not Found.
           content:
@@ -1576,10 +1661,12 @@ components:
           description: The role metadata (base64 encoded).
           type: string
           format: base64
+          nullable: true
           example: QXY...
         users:
           description: The role's users.
           type: array
+          nullable: true
           items:
             description: Users
             type: object
@@ -1591,6 +1678,7 @@ components:
         permissions:
           description: The role's permissions
           type: array
+          nullable: true
           items:
             description: Permission
             $ref: '#/components/schemas/PermissionResponse'
