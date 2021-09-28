@@ -44,7 +44,7 @@ info:
     | USER        | USER_ID   | VIEW_ROLE        | View user roles |
     | USER        | USER_ID   | DELETE           | Delete user |
     | ROLE        | N/A       | CREATE           | Create roles |
-    | ROLE        | ROLE_ID   | VIEW_METADATA    | View role metadata |
+    | ROLE        | ROLE_ID   | VIEW             | View role and metadata |
     | ROLE        | ROLE_ID   | SET_METADATA     | Set role metadata |
     | ROLE        | ROLE_ID   | VIEW_USERS       | View role users |
     | ROLE        | ROLE_ID   | MODIFY_USERS     | Modify role users |
@@ -734,14 +734,23 @@ paths:
       responses:
         '201':
           description: Role created.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RoleResponse'
   /v1/role/{roleId}:
     get:
       summary: Get role data.
-      description: Get role data.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:VIEW permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
+        * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
+        * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA, USERS, PERMISSIONS
+        * Endpoint MUST return 403 with the USERS_FORBIDDEN code when the `include` parameter includes USERS and the user does not have the ROLE@ROLE_ID:VIEW_USERS permission
+        * Endpoint MUST return 403 with the PERMISSONS_FORBIDDEN code when the `include` parameter includes PERMISSIONS and the user does not have the ROLE@ROLE_ID:VIEW_PERMISSONS permission
+        * Endpoint MUST return 200 with the id field on success
+        * Endpoint MUST return the metadata field as a base64 encoded string (or blank string if empty) only when the `include` parameter includes METADATA (the field is omitted otherwise)
+        * Endpoint MUST return the users field only when the `include` parameter includes USERS (the field is omitted otherwise)
+        * Endpoint MAY return users from the specified role in a sorted order
+        * Endpoint MUST return the permissions field only when the `include` parameter includes PERMISSIONS (the field is omitted otherwise)
+        * Endpoint MAY return permissions from the specified role in a sorted order
       tags:
         - Role
       parameters:
@@ -752,6 +761,18 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: include
+          in: query
+          description: Additional information to include
+          required: false
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [METADATA, USERS, PERMISSIONS]
+            default: ''
       responses:
         '200':
           description: Role data.
@@ -759,6 +780,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RoleResponse'
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_ROLE_ID, MALFORMED_INCLUDE_PARAMETER]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [FORBIDDEN, USERS_FORBIDDEN, PERMISSONS_FORBIDDEN]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [ROLE_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       summary: Delete role.
       description: |
@@ -824,7 +897,7 @@ paths:
       summary: Get role metadata.
       description: |
         * Endpoint MUST Authenticate (see above)
-        * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:VIEW_METADATA permission (see above)
+        * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:VIEW permission (see above)
         * Endpoint MUST return 400 with the MALFORMED_ROLE_ID code when the path parameter `roleId` is not a uuid
         * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
         * Endpoint MUST calculate and set the Digest header for every 2XX response
@@ -1508,9 +1581,13 @@ components:
           description: The role's users.
           type: array
           items:
-            description: User id.
-            type: string
-            format: uuid
+            description: Users
+            type: object
+            properties:
+              id:
+                description: User id.
+                type: string
+                format: uuid
         permissions:
           description: The role's permissions
           type: array
