@@ -144,7 +144,7 @@ paths:
         * Endpoint MUST Authorize, requiring the REPOSITORY:SET_METADATA permission (see above)
         * Endpoint MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
         * Endpoint MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
-        * Endpoint MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 has of the request body
+        * Endpoint MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 hash of the request body
         * Endpoint MUST store the entire request body as the metadata
         * Endpoint MUST return 201 with an empty body on success
       tags:
@@ -602,7 +602,13 @@ paths:
   /v1/user/{userId}/key:
     get:
       summary: Get user keys.
-      description: Get user keys.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the USER@USER_ID:VIEW_KEYS permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_USER_ID code when the path parameter `userId` is not a uuid
+        * Endpoint MUST return 404 with the USER_NOT_FOUND code when the user is not found
+        * Endpoint MUST return 200 with all keys from the specified user
+        * Endpoint MAY return all keys from the specified user in a sorted order
       tags:
         - User
       parameters:
@@ -616,9 +622,77 @@ paths:
       responses:
         '200':
           description: User keys.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    description: Key data.
+                    type: array
+                    items:
+                      description: Keys
+                      type: object
+                      properties:
+                        id:
+                          description: The key ID.
+                          type: string
+                        key:
+                          description: The key.
+                          type: string
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_USER_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [USER_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
       summary: Add a user key.
-      description: Add a user key.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the USER@USER_ID:MODIFY_KEYS permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_USER_ID code when the path parameter `userId` is not a uuid
+        * Endpoint MUST return 404 with the USER_NOT_FOUND code when the user is not found
+        * Endpoint MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
+        * Endpoint MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
+        * Endpoint MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 hash of the request body
+        * Endpoint MUST return 400 with the MALFORMED_KEY code when the request body is not a valid key TODO more clearly define this
+        * Endpoint MAY return 400 with the DUPLICATE_KEY code when the key is already associated with the user
+        * Endpoint MUST generate a new id and assign it as the key ID
+        * Endpoint MUST store the entire request body as the key
+        * Endpoint MUST return 201 with the key ID
       tags:
         - User
       parameters:
@@ -629,9 +703,70 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: Digest
+          in: header
+          description: The SHA-256 hash of the request body.
+          required: true
+          schema:
+            type: string
+            example: sha-256=YTU......
+      requestBody:
+        description: Binary metadata
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
       responses:
         '201':
           description: User key added.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    description: The key ID.
+                    type: string
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_USER_ID, MISSING_DIGEST_HEADER, MALFORMED_DIGEST_HEADER, DIGEST_BODY_MISMATCH, MALFORMED_KEY, DUPLICATE_KEY]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [USER_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/user/{userId}/key/{key}:
     get:
       summary: Get user key.
@@ -1162,7 +1297,7 @@ paths:
         * Endpoint MUST return 404 with the ROLE_NOT_FOUND code when the role is not found
         * Endpoint MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
         * Endpoint MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
-        * Endpoint MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 has of the request body
+        * Endpoint MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 hash of the request body
         * Endpoint MUST store the entire request body as the role metadata
         * Endpoint MUST return 201 with an empty body on success
       tags:
@@ -1486,7 +1621,7 @@ paths:
                 type: object
                 properties:
                   data:
-                    description: Shard data.
+                    description: Permissions data.
                     type: array
                     items:
                       description: Permissions
