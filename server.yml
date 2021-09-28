@@ -40,8 +40,9 @@ info:
     | USER        | N/A       | CREATE           | Create a user |
     | USER        | USER_ID   | VIEW_METADATA    | View user metadata |
     | USER        | USER_ID   | SET_METADATA     | Set user metadata |
+    | USER        | USER_ID   | VIEW_KEYS        | View user keys |
     | USER        | USER_ID   | MODIFY_KEYS      | Modify user keys |
-    | USER        | USER_ID   | VIEW_ROLE        | View user roles |
+    | USER        | USER_ID   | VIEW_ROLE        | View user roles TODO is this used?|
     | USER        | USER_ID   | DELETE           | Delete user |
     | ROLE        | N/A       | CREATE           | Create roles |
     | ROLE        | ROLE_ID   | VIEW             | View role and metadata |
@@ -634,7 +635,15 @@ paths:
   /v1/user/{userId}/key/{key}:
     get:
       summary: Get user key.
-      description: Get user key.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the USER@USER_ID:VIEW_KEYS permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_USER_ID code when the path parameter `userId` is not a uuid
+        * Endpoint MUST return 404 with the USER_NOT_FOUND code when the user is not found
+        * Endpoint MAY return 400 with the MALFORMED_KEY_ID code when the path parameter `keyId` is malformed
+        * Endpoint MAY return 404 with the KEY_NOT_FOUND code when the key is not found
+        * Endpoint MUST calculate and set the Digest header for every 2XX response
+        * Endpoint MUST return 200 with the key on success
       tags:
         - User
       parameters:
@@ -645,19 +654,76 @@ paths:
           schema:
             type: string
             format: uuid
-        - name: key
+        - name: keyId
           in: path
           description: Key ID
           required: true
           schema:
             type: string
-            format: tbd
       responses:
         '200':
           description: User key.
+          headers:
+            Digest:
+              description: A SHA-256 has of the response body
+              schema:
+                type: string
+                example: sha-256=YTU......
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_USER_ID, MALFORMED_KEY_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [USER_NOT_FOUND, KEY_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
       summary: Remove user key.
-      description: Remove user key.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the USER@USER_ID:MODIFY_KEYS permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_USER_ID code when the path parameter `userId` is not a uuid
+        * Endpoint MUST return 404 with the USER_NOT_FOUND code when the user is not found
+        * Endpoint MAY return 400 with the MALFORMED_KEY_ID code when the path parameter `keyId` is malformed
+        * Endpoint MAY return 404 with the KEY_NOT_FOUND code when the key is not found
+        * Endpoint MUST remove the specified key from the specified user
+        * Endpoint MUST return 204 with an empty body on success
+        * Endpoint MAY be idempotent and MAY not error if the specified key is not currently associated with the specified user
       tags:
         - User
       parameters:
@@ -668,16 +734,53 @@ paths:
           schema:
             type: string
             format: uuid
-        - name: key
+        - name: keyId
           in: path
           description: Key ID
           required: true
           schema:
             type: string
-            format: tbd
       responses:
         '204':
-          description: User key removed.
+          description: User key removed. No response body returned.
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_USER_ID, MALFORMED_KEY_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [USER_NOT_FOUND, KEY_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/role:
     get:
       summary: Get role data.
