@@ -38,7 +38,7 @@ info:
     | SHARD       | SHARD_ID  | COMMIT           | Commit to a shard |
     | SHARD       | SHARD_ID  | DELETE           | Delete a shard |
     | USER        | N/A       | CREATE           | Create a user |
-    | USER        | USER_ID   | VIEW_METADATA    | View user metadata |
+    | USER        | USER_ID   | VIEW             | View user and metadata |
     | USER        | USER_ID   | SET_METADATA     | Set user metadata |
     | USER        | USER_ID   | VIEW_KEYS        | View user keys |
     | USER        | USER_ID   | MODIFY_KEYS      | Modify user keys |
@@ -569,7 +569,14 @@ paths:
   /v1/user/{userId}/metadata:
     get:
       summary: Get user metadata.
-      description: Get user metadata.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the USER@USER_ID:VIEW permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_USER_ID code when the path parameter `userId` is not a uuid
+        * Endpoint MUST return 404 with the USER_NOT_FOUND code when the user is not found
+        * Endpoint MUST calculate and set the Digest header for every 2XX response
+        * Endpoint MUST return 200 with the metadata in the response body on success
+        * Endpoint MUST return 0 bytes in the response body if no metadata is present
       tags:
         - User
       parameters:
@@ -583,9 +590,67 @@ paths:
       responses:
         '200':
           description: User metadata.
+          headers:
+            Digest:
+              description: A SHA-256 has of the response body
+              schema:
+                type: string
+                example: sha-256=YTU......
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_USER_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [USER_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
     put:
       summary: Set user metadata.
-      description: Set user metadata.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the USER@USER_ID:SET_METADATA permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_USER_ID code when the path parameter `userId` is not a uuid
+        * Endpoint MUST return 404 with the USER_NOT_FOUND code when the user is not found
+        * Endpoint MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
+        * Endpoint MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
+        * Endpoint MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 hash of the request body
+        * Endpoint MUST store the entire request body as the user metadata
+        * Endpoint MUST return 201 with an empty body on success
       tags:
         - User
       parameters:
@@ -596,9 +661,54 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: Digest
+          in: header
+          description: The SHA-256 hash of the request body.
+          required: true
+          schema:
+            type: string
+            example: sha-256=YTU......
       responses:
         '201':
-          description: User metadata set.
+          description: User metadata set (there is no response body).
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_USER_ID, MISSING_DIGEST_HEADER, MALFORMED_DIGEST_HEADER, DIGEST_BODY_MISMATCH]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [USER_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/user/{userId}/key:
     get:
       summary: Get user keys.
