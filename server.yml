@@ -352,7 +352,7 @@ paths:
   /v1/shard/{shardId}:
     get:
       summary: Get shard data.
-      description: Get shard data.
+      description: TODO Get shard data.
       tags:
         - Shard
       parameters:
@@ -380,7 +380,7 @@ paths:
           description: Shard data.
     put:
       summary: Create a shard with a particular ID.
-      description: Set shard data.
+      description: TODO Set shard data.
       tags:
         - Shard
       parameters:
@@ -396,7 +396,7 @@ paths:
           description: Shard data.
     delete:
       summary: Delete a shard with a particular ID.
-      description: Delete shard.
+      description: TODO Delete shard.
       tags:
         - Shard
       parameters:
@@ -413,7 +413,7 @@ paths:
   /v1/shard/{shardId}/metadata:
     get:
       summary: Get shard metadata.
-      description: Get shard metadata.
+      description: TODO Get shard metadata.
       tags:
         - Shard
       parameters:
@@ -429,7 +429,7 @@ paths:
           description: Get shard metadata.
     put:
       summary: Set shard metadata.
-      description: Set shard metadata.
+      description: TODO Set shard metadata.
       tags:
         - Shard
       parameters:
@@ -446,7 +446,7 @@ paths:
   /v1/shard/{shardId}/commit:
     get:
       summary: Get shard commits.
-      description: Get shard commits.
+      description: TODO Get shard commits.
       tags:
         - Shard
       parameters:
@@ -462,7 +462,7 @@ paths:
           description: Get shard commits.
     post:
       summary: Create shard commit.
-      description: Create shard commit.
+      description: TODO Create shard commit.
       tags:
         - Shard
       parameters:
@@ -479,7 +479,7 @@ paths:
   /v1/shard/{shardId}/commit/{number}:
     get:
       summary: Get shard commit.
-      description: Get shard commit.
+      description: TODO Get shard commit.
       tags:
         - Shard
       parameters:
@@ -502,7 +502,7 @@ paths:
           description: Get shard commit.
     put:
       summary: Create shard commit.
-      description: Create shard commit. Will fail unless commit number is the next number in sequence.
+      description: TODO Create shard commit. Will fail unless commit number is the next number in sequence.
       tags:
         - Shard
       parameters:
@@ -518,25 +518,164 @@ paths:
           description: Shard commit created.
   /v1/user:
     get:
-      summary: Get repository users.
-      description: Get repository users and their metadata.
+      summary: Get users.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the USER@USER_ID:VIEW permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA, KEYS
+        * Endpoint MUST return 400 with the MALFORMED_AFTER_PARAMETER code when the query parameter `after` is not blank and is not a uuid
+        * Endpoint MUST return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer greater than 1
+        * Endpoint MAY return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer less than a positive integer determined by the Endpoint
+        * Endpoint MUST return 200 with an list of users:
+            * in alphanumeric ascending order
+            * starting after the value of the query parameter `after` (if set)
+            * limited to the value of the query parameter `limit` (if set)
+        * Endpoint MUST NOT return users that the user does not have USER@USER_ID:VIEW access to
+        * Endpoint MUST return the metadata field as a base64 encoded string (or blank string if empty) only when the `include` parameter includes METADATA (the field is omitted otherwise)
+        * Endpoint MUST return the keys field only when the `include` parameter includes KEYS (the field is omitted otherwise)
+        * Endpoint MUST return null for the keys field when the `include` parameter includes KEYS and the user does not have the USER@USER_ID:VIEW permission for that user
+        * Endpoint MAY return keys from the specified user in a sorted order
       tags:
         - User
+      parameters:
+        - name: include
+          in: query
+          description: Additional information to include
+          required: false
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [METADATA, KEYS]
+            default: ''
+        - name: after
+          in: query
+          description: Retrieve roles after this one
+          required: false
+          schema:
+            type: string
+            format: uuid
+            default: ''
+        - name: limit
+          in: query
+          description: Maximum number of roles to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
       responses:
         '200':
           description: Repository users.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    description: Role data.
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_INCLUDE_PARAMETER, MALFORMED_AFTER_PARAMETER, MALFORMED_LIMIT_PARAMETER]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
-      summary: Create repository user.
-      description: Create repository user.
+      summary: Create user.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the USER:CREATE permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_REQUEST_BODY code when the request body is not a valid JSON object
+        * Endpoint MUST return 400 with the MALFORMED_METADATA_FIELD code when the metadata field is not an empty or base64 encoded string
+        * Endpoint MUST generate a new uuid and assign it as the user ID
+        * Endpoint MUST add the user and metadata under the new ID
+        * Endpoint MUST return 201 with the newly created user ID
       tags:
         - User
+      requestBody:
+        description: User data
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                metadata:
+                  description: User metadata (base64 encoded string), or an empty string if there is no user metadata.
+                  type: string
+                  format: base64
+                  example: QXY...
+              required: [metadata]
       responses:
         '201':
-          description: Repository user created.
+          description: User created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    description: The user id.
+                    type: string
+                    format: uuid
+                required: [id]
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_REQUEST_BODY, MALFORMED_METADATA_FIELD]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/user/{userId}:
     get:
       summary: Get user data.
-      description: Get user data.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the USER@USER_ID:VIEW permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_USER_ID code when the path parameter `userId` is not a uuid
+        * Endpoint MUST return 404 with the USER_NOT_FOUND code when the user is not found
+        * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA, KEYS
+        * Endpoint MUST return 200 with the id field on success
+        * Endpoint MUST return the metadata field as a base64 encoded string (or blank string if empty) only when the `include` parameter includes METADATA (the field is omitted otherwise)
+        * Endpoint MUST return the keys field when the `include` parameter includes KEYS (the field is omitted otherwise)
+        * Endpoint MUST return null for the keys field when the `include` parameter includes KEYS and the user does not have the USER@USER_ID:VIEW_KEYS permission
+        * Endpoint MAY return keys from the specified user in a sorted order
       tags:
         - User
       parameters:
@@ -547,12 +686,72 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: include
+          in: query
+          description: Additional information to include
+          required: false
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum: [METADATA, KEYS]
+            default: ''
       responses:
         '200':
           description: User data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_USER_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [USER_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
-      summary: Delete a user.
-      description: Delete user.
+      summary: Delete user.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the USER@USER_ID:DELETE permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_USER_ID code when the path parameter `userId` is not a uuid
+        * Endpoint MUST return 404 with the USER_NOT_FOUND code when the user is not found
+        * Endpoint MUST remove the user and all associated information
+        * Endpoint MUST return 200 with an empty body on success
       tags:
         - User
       parameters:
@@ -565,7 +764,45 @@ paths:
             format: uuid
       responses:
         '204':
-          description: User deleted.
+          description: User removed (there is no response body).
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_USER_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [USER_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/user/{userId}/metadata:
     get:
       summary: Get user metadata.
@@ -1028,7 +1265,7 @@ paths:
           $ref: '#/components/responses/InternalError'
   /v1/role:
     get:
-      summary: Get role data.
+      summary: Get roles.
       description: |
         * Endpoint MUST Authenticate (see above)
         * Endpoint MUST Authorize, requiring the ROLE@ROLE_ID:VIEW permission for each role returned (see above)
@@ -1123,8 +1360,7 @@ paths:
         * Endpoint MUST return 400 with the MALFORMED_METADATA_FIELD code when the metadata field is not an empty or base64 encoded string
         * Endpoint MUST generate a new uuid and assign it as the role ID
         * Endpoint MUST add the role and metadata under the new ID
-        * Endpoint MUST return 201 with the newly created role ID and base64 encoded metadata
-        * Endpoint MUST return an empty string if there is no role metadata
+        * Endpoint MUST return 201 with the newly created role ID
       tags:
         - Role
       requestBody:
@@ -1153,12 +1389,7 @@ paths:
                     description: The role id.
                     type: string
                     format: uuid
-                  metadata:
-                    description: The role metadata (base64 encoded).
-                    type: string
-                    format: base64
-                    example: QXY...
-                required: [id, metadata]
+                required: [id]
         '400':
           description: Bad Request.
           content:
@@ -1285,7 +1516,7 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
+        '204':
           description: Role removed (there is no response body).
         '400':
           description: Bad Request.
@@ -1998,6 +2229,34 @@ components:
                 example: Helpful feedback for the developer.
             required: [code, description]
   schemas:
+    UserResponse:
+      type: object
+      properties:
+        id:
+          description: The user id.
+          type: string
+          format: uuid
+        metadata:
+          description: The user metadata (base64 encoded).
+          type: string
+          format: base64
+          nullable: true
+          example: QXY...
+        keys:
+          description: The users's keys.
+          type: array
+          nullable: true
+          items:
+            description: Keys
+            type: object
+            properties:
+              id:
+                description: The key ID.
+                type: string
+              key:
+                description: The key.
+                type: string
+      required: [id, metadata, keys]
     RoleResponse:
       type: object
       properties:
