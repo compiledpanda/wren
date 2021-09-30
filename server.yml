@@ -42,7 +42,6 @@ info:
     | USER        | USER_ID   | SET_METADATA     | Set user metadata |
     | USER        | USER_ID   | VIEW_KEYS        | View user keys |
     | USER        | USER_ID   | MODIFY_KEYS      | Modify user keys |
-    | USER        | USER_ID   | VIEW_ROLE        | View user roles TODO is this used?|
     | USER        | USER_ID   | DELETE           | Delete user |
     | ROLE        | N/A       | CREATE           | Create roles |
     | ROLE        | ROLE_ID   | VIEW             | View role and metadata |
@@ -522,7 +521,7 @@ paths:
       description: |
         * Endpoint MUST Authenticate (see above)
         * Endpoint MUST Authorize, requiring the USER@USER_ID:VIEW permission (see above)
-        * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA, KEYS
+        * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA, KEYS, ROLES
         * Endpoint MUST return 400 with the MALFORMED_AFTER_PARAMETER code when the query parameter `after` is not blank and is not a uuid
         * Endpoint MUST return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer greater than 1
         * Endpoint MAY return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer less than a positive integer determined by the Endpoint
@@ -535,6 +534,9 @@ paths:
         * Endpoint MUST return the keys field only when the `include` parameter includes KEYS (the field is omitted otherwise)
         * Endpoint MUST return null for the keys field when the `include` parameter includes KEYS and the user does not have the USER@USER_ID:VIEW permission for that user
         * Endpoint MAY return keys from the specified user in a sorted order
+        * Endpoint MUST return the roles field when the `include` parameter includes ROLES (the field is omitted otherwise)
+        * Endpoint MUST omit a role from the roles field when the `include` parameter includes ROLES and the user does not have the ROLE@ROLE_ID:VIEW permission
+        * Endpoint MAY return roles from the specified user in a sorted order
       tags:
         - User
       parameters:
@@ -548,7 +550,7 @@ paths:
             type: array
             items:
               type: string
-              enum: [METADATA, KEYS]
+              enum: [METADATA, KEYS, ROLES]
             default: ''
         - name: after
           in: query
@@ -670,12 +672,15 @@ paths:
         * Endpoint MUST Authorize, requiring the USER@USER_ID:VIEW permission (see above)
         * Endpoint MUST return 400 with the MALFORMED_USER_ID code when the path parameter `userId` is not a uuid
         * Endpoint MUST return 404 with the USER_NOT_FOUND code when the user is not found
-        * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA, KEYS
+        * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA, KEYS, ROLES
         * Endpoint MUST return 200 with the id field on success
         * Endpoint MUST return the metadata field as a base64 encoded string (or blank string if empty) only when the `include` parameter includes METADATA (the field is omitted otherwise)
         * Endpoint MUST return the keys field when the `include` parameter includes KEYS (the field is omitted otherwise)
         * Endpoint MUST return null for the keys field when the `include` parameter includes KEYS and the user does not have the USER@USER_ID:VIEW_KEYS permission
         * Endpoint MAY return keys from the specified user in a sorted order
+        * Endpoint MUST return the roles field when the `include` parameter includes ROLES (the field is omitted otherwise)
+        * Endpoint MUST omit a role from the roles field when the `include` parameter includes ROLES and the user does not have the ROLE@ROLE_ID:VIEW permission
+        * Endpoint MAY return roles from the specified user in a sorted order
       tags:
         - User
       parameters:
@@ -696,7 +701,7 @@ paths:
             type: array
             items:
               type: string
-              enum: [METADATA, KEYS]
+              enum: [METADATA, KEYS, ROLES]
             default: ''
       responses:
         '200':
@@ -2256,7 +2261,21 @@ components:
               key:
                 description: The key.
                 type: string
-      required: [id, metadata, keys]
+        roles:
+          description: The users's roles.
+          type: array
+          nullable: true
+          items:
+            description: Roles
+            type: object
+            properties:
+              id:
+                description: The role ID.
+                type: string
+              metadata:
+                description: The role metadata.
+                type: string
+      required: [id, metadata, keys, roles]
     RoleResponse:
       type: object
       properties:
