@@ -58,6 +58,11 @@ info:
     | `SHARD@*:VIEW` | View all shard metadata and statistics |
     | `SHARD@1234:GET_COMMITS` | Get commits for shard 1234 |
 
+    ### Commits
+    Commits are blobs of data, composed of a metadata section and a data section. The are always accompanied by a Data Offset, which is an unsigned integer pointing to the first byte of data after the metadata section. Note that all commits (metadata and data) must be byte-aligned when transmitted, as the offset is the number of bytes, not bits.
+
+    Commits are associated with a shard, and assigned a number when stored. The number is an incrementing integer starting at 1 for the first commit, 2 for the second, and so on.  
+
     ### Errors
     Errors (non-2XX) MUST return with a `Content-Type: application/json` header and a response body in the following format: `{"code": "X_Y_Z", "description": "A b c"}`. The code MUST be a UPPER_SNAKE_CASE string and is part of the API contract. The description MUST be a string. The value of the description string is NOT part of the official API contract and is implementation specific.
 
@@ -443,25 +448,21 @@ paths:
         '201':
           description: Shard metadata set.
   /v1/shard/{shardId}/commit:
-    get:
-      summary: Get shard commits.
-      description: TODO Get shard commits.
-      tags:
-        - Shard
-      parameters:
-        - name: shardId
-          in: path
-          description: Shard ID
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Get shard commits.
     post:
       summary: Create shard commit.
-      description: TODO Create shard commit.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the SHARD@SHARD_ID:COMMIT permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_SHARD_ID code when the path parameter `shardId` is not a uuid
+        * Endpoint MUST return 404 with the SHARD_NOT_FOUND code when the shard is not found
+        * Endpoint MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
+        * Endpoint MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
+        * Endpoint MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 hash of the request body
+        * Endpoint MUST return 400 with the MISSING_DATA_OFFSET_HEADER code when the Data-Offset header is not present in the request
+        * Endpoint MUST return 400 with the MALFORMED_DATA_OFFSET_HEADER code when the Data-Offset header is not a valid unsigned integer
+        * Endpoint MUST return 400 with the INVALID_DATA_OFFSET code when the Data-Offset is larger than the Content-Length
+        * Endpoint MUST store the commit with the next available commit id
+        * Endpoint MUST return 201 with the commit id in the response body
       tags:
         - Shard
       parameters:
@@ -472,13 +473,83 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: Digest
+          in: header
+          description: The SHA-256 hash of the request body.
+          required: true
+          schema:
+            type: string
+            example: sha-256=YTU......
+        - name: Data-Offset
+          in: header
+          description: The offset (in bytes) pointing to the first byte of data (after the metadata)
+          required: true
+          schema:
+            type: integer
+            example: 37
       responses:
         '201':
           description: Shard commit created.
-  /v1/shard/{shardId}/commit/{number}:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    description: The commit id.
+                    type: integer
+                    example: 42
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_SHARD_ID, MISSING_DIGEST_HEADER, MALFORMED_DIGEST_HEADER, DIGEST_BODY_MISMATCH, MISSING_DATA_OFFSET_HEADER, MALFORMED_DATA_OFFSET_HEADER, INVALID_DATA_OFFSET]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [SHARD_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/shard/{shardId}/commit/{commitId}:
     get:
       summary: Get shard commit.
-      description: TODO Get shard commit.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the SHARD@SHARD_ID:GET_COMMITS permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_SHARD_ID code when the path parameter `shardId` is not a uuid
+        * Endpoint MUST return 404 with the SHARD_NOT_FOUND code when the shard is not found
+        * Endpoint MUST return 400 with the MALFORMED_COMMIT_ID code when the path parameter `commitId` is not a unsigned integer
+        * Endpoint MUST return 404 with the COMMIT_NOT_FOUND code when the commit is not found
+        * Endpoint MUST calculate and set the Digest header for every 2XX response
+        * Endpoint MUST set the Data-Offset header for every 2XX response
+        * Endpoint MUST return 200 with the commit as the response body
       tags:
         - Shard
       parameters:
@@ -489,7 +560,7 @@ paths:
           schema:
             type: string
             format: uuid
-        - name: number
+        - name: commitId
           in: path
           description: Commit ID
           required: true
@@ -498,10 +569,78 @@ paths:
             format: uint64
       responses:
         '200':
-          description: Get shard commit.
+          description: Commit.
+          headers:
+            Digest:
+              description: A SHA-256 has of the response body
+              schema:
+                type: string
+                example: sha-256=YTU......
+            Data-Offset:
+              description: The offset (in bytes) pointing to the first byte of data (after the metadata)
+              schema:
+                type: integer
+                example: 37
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_SHARD_ID, MALFORMED_COMMIT_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [SHARD_NOT_FOUND, COMMIT_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
     put:
       summary: Create shard commit.
-      description: TODO Create shard commit. Will fail unless commit number is the next number in sequence.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the SHARD@SHARD_ID:COMMIT permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_SHARD_ID code when the path parameter `shardId` is not a uuid
+        * Endpoint MUST return 404 with the SHARD_NOT_FOUND code when the shard is not found
+        * Endpoint MUST return 400 with the MALFORMED_COMMIT_ID code when the path parameter `commitId` is not a unsigned integer
+        * Endpoint MUST return 400 with the INVALID_COMMIT_ID code when the path parameter `commitId` is not the next unused commit id
+        * Endpoint MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
+        * Endpoint MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
+        * Endpoint MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 hash of the request body
+        * Endpoint MUST return 400 with the MISSING_DATA_OFFSET_HEADER code when the Data-Offset header is not present in the request
+        * Endpoint MUST return 400 with the MALFORMED_DATA_OFFSET_HEADER code when the Data-Offset header is not a valid unsigned integer
+        * Endpoint MUST return 400 with the INVALID_DATA_OFFSET code when the Data-Offset is larger than the Content-Length
+        * Endpoint MUST store the commit with the passed in id
+        * Endpoint MUST return 201 with an empty response body
       tags:
         - Shard
       parameters:
@@ -512,9 +651,68 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: commitId
+          in: path
+          description: Commit ID
+          required: true
+          schema:
+            type: integer
+            format: uint64
+        - name: Digest
+          in: header
+          description: The SHA-256 hash of the request body.
+          required: true
+          schema:
+            type: string
+            example: sha-256=YTU......
+        - name: Data-Offset
+          in: header
+          description: The offset (in bytes) pointing to the first byte of data (after the metadata)
+          required: true
+          schema:
+            type: integer
+            example: 37
       responses:
         '201':
-          description: Shard commit created.
+          description: Shard commit created (no response body).
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_SHARD_ID, MALFORMED_COMMIT_ID, INVALID_COMMIT_ID, MISSING_DIGEST_HEADER, MALFORMED_DIGEST_HEADER, DIGEST_BODY_MISMATCH, MISSING_DATA_OFFSET_HEADER, MALFORMED_DATA_OFFSET_HEADER, INVALID_DATA_OFFSET]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [SHARD_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/user:
     get:
       summary: Get users.
