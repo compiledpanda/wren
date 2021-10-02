@@ -199,7 +199,7 @@ paths:
       summary: Get repository shards.
       description: |
         * Endpoint MUST Authenticate (see above)
-        * Endpoint MUST Authorize, requiring the SHARD@[Shard ID]:VIEW permission for each shard returned (see above)
+        * Endpoint MUST Authorize, requiring the SHARD@SHARD_ID:VIEW permission for each shard returned (see above)
         * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA
         * Endpoint MUST return 400 with the MALFORMED_AFTER_PARAMETER code when the query parameter `after` is not blank and is not a uuid
         * Endpoint MUST return 400 with the MALFORMED_LIMIT_PARAMETER code when the query parameter `limit` is not blank and is not an integer greater than 1
@@ -208,9 +208,10 @@ paths:
             * in alphanumeric ascending order
             * starting after the value of the query parameter `after` (if set)
             * limited to the value of the query parameter `limit` (if set)
-        * Endpoint MUST NOT return shards that the user does not have SHARD@[Shard ID]:VIEW access to
+        * Endpoint MUST NOT return shards that the user does not have SHARD@SHARD_ID:VIEW access to
         * Endpoint MUST return shard metadata as a base64 encoded string only when the query parameter `include` contains METADATA
         * Endpoint MUST return an empty string if there is no shard metadata when returning shard metadata
+        * Endpoint MUST return the current number of commits in the shard
       tags:
         - Shard
       parameters:
@@ -251,20 +252,10 @@ paths:
                 type: object
                 properties:
                   data:
-                    description: Shard data.
+                    description: Role data.
                     type: array
                     items:
-                      type: object
-                      properties:
-                        id:
-                          description: The shard id.
-                          type: string
-                          format: uuid
-                        metadata:
-                          description: The shard metadata (base64 encoded). Only included when ?include=METADATA
-                          type: string
-                          format: base64
-                          example: QXY...
+                      $ref: '#/components/schemas/ShardResponse'
         '400':
           description: Bad Request.
           content:
@@ -295,8 +286,7 @@ paths:
         * Endpoint MUST return 400 with the MALFORMED_REQUEST_BODY code when the request body is not a valid JSON object
         * Endpoint MUST return 400 with the MALFORMED_METADATA_FIELD code when the metadata field is not an empty or base64 encoded string
         * Endpoint MUST generate a new uuid and assign it as the shard ID
-        * Endpoint MUST return 201 with the newly created shard ID and base64 encoded metadata
-        * Endpoint MUST return an empty string if there is no shard metadata
+        * Endpoint MUST return 201 with the newly created shard ID
       tags:
         - Shard
       requestBody:
@@ -325,12 +315,7 @@ paths:
                     description: The shard id.
                     type: string
                     format: uuid
-                  metadata:
-                    description: The shard metadata (base64 encoded).
-                    type: string
-                    format: base64
-                    example: QXY...
-                required: [id, metadata]
+                required: [id]
         '400':
           description: Bad Request.
           content:
@@ -356,7 +341,13 @@ paths:
   /v1/shard/{shardId}:
     get:
       summary: Get shard data.
-      description: TODO Get shard data.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the SHARD@SHARD_ID:VIEW permission for each shard returned (see above)
+        * Endpoint MUST return 400 with the MALFORMED_INCLUDE_PARAMETER code when the query parameter `include` is not blank and is not a comma-separated list of items where each item is equal to one-of: METADATA
+        * Endpoint MUST return shard metadata as a base64 encoded string only when the query parameter `include` contains METADATA
+        * Endpoint MUST return an empty string if there is no shard metadata when returning shard metadata
+        * Endpoint MUST return the current number of commits in the shard
       tags:
         - Shard
       parameters:
@@ -382,9 +373,21 @@ paths:
       responses:
         '200':
           description: Shard data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShardResponse'
     put:
       summary: Create a shard with a particular ID.
-      description: TODO Set shard data.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the SHARD:CREATE permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_SHARD_ID code when the path parameter `shardId` is not a uuid
+        * Endpoint MUST return 409 with the SHARD_EXISTS code when the path parameter `shardId` is already in use
+        * Endpoint MUST return 400 with the MALFORMED_REQUEST_BODY code when the request body is not a valid JSON object
+        * Endpoint MUST return 400 with the MALFORMED_METADATA_FIELD code when the metadata field is not an empty or base64 encoded string
+        * Endpoint MUST create the shard using the passed in shard ID and associate the passed in metadata with the shard
+        * Endpoint MUST return 201 with the shard ID
       tags:
         - Shard
       parameters:
@@ -395,12 +398,80 @@ paths:
           schema:
             type: string
             format: uuid
+      requestBody:
+        description: Shard data
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                metadata:
+                  description: Shard metadata (base64 encoded string), or an empty string if there is no shard metadata.
+                  type: string
+                  format: base64
+                  example: QXY...
+              required: [metadata]
       responses:
-        '200':
-          description: Shard data.
+        '201':
+          description: Shard created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    description: The shard id.
+                    type: string
+                    format: uuid
+                required: [id]
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_SHARD_ID, MALFORMED_REQUEST_BODY, MALFORMED_METADATA_FIELD]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Conflict.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [SHARD_EXISTS]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
-      summary: Delete a shard with a particular ID.
-      description: TODO Delete shard.
+      summary: Delete shard.
+      description: |
+        * Endpoint MUST Authenticate (see above)
+        * Endpoint MUST Authorize, requiring the SHARD@SHARD_ID:DELETE permission (see above)
+        * Endpoint MUST return 400 with the MALFORMED_SHARD_ID code when the path parameter `shardId` is not a uuid
+        * Endpoint MUST return 404 with the SHARD_NOT_FOUND code when the shard is not found
+        * Endpoint MUST remove the shard and all associated information
+        * Endpoint MUST return 200 with an empty body on success
       tags:
         - Shard
       parameters:
@@ -413,7 +484,45 @@ paths:
             format: uuid
       responses:
         '204':
-          description: Shard deleted.
+          description: Shard deleted (there is no response body).
+        '400':
+          description: Bad Request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [MALFORMED_SHARD_ID]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Not Found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    description: The error code.
+                    type: string
+                    enum: [SHARD_NOT_FOUND]
+                  description:
+                    description: The error description.
+                    type: string
+                    example: Helpful feedback for the developer.
+                required: [code, description]
+        '500':
+          $ref: '#/components/responses/InternalError'
   /v1/shard/{shardId}/metadata:
     get:
       summary: Get shard metadata.
@@ -2542,6 +2651,23 @@ components:
                 example: Helpful feedback for the developer.
             required: [code, description]
   schemas:
+    ShardResponse:
+      type: object
+      properties:
+        id:
+          description: The user id.
+          type: string
+          format: uuid
+        metadata:
+          description: The user metadata (base64 encoded).
+          type: string
+          format: base64
+          nullable: true
+          example: QXY...
+        commits:
+          description: The current number of commits in the shard.
+          type: integer
+          example: 42
     UserResponse:
       type: object
       properties:
