@@ -1406,6 +1406,9 @@ paths:
                         id:
                           description: The key ID.
                           type: string
+                        metadata:
+                          description: The key metadata.
+                          type: string
                         key:
                           description: The key.
                           type: string
@@ -1454,13 +1457,12 @@ paths:
         * Endpoint MUST Authorize, requiring the USER@USER_ID:MODIFY_KEYS permission (see above)
         * Endpoint MUST return 400 with the MALFORMED_USER_ID code when the path parameter `userId` is not a uuid
         * Endpoint MUST return 404 with the USER_NOT_FOUND code when the user is not found
-        * Endpoint MUST return 400 with the MISSING_DIGEST_HEADER code when the Digest header is not present in the request
-        * Endpoint MUST return 400 with the MALFORMED_DIGEST_HEADER code when the Digest header is not valid or does not contain a SHA-256 hash
-        * Endpoint MUST return 400 with the DIGEST_BODY_MISMATCH code when the Digest hash does not match the SHA-256 hash of the request body
-        * Endpoint MUST return 400 with the MALFORMED_KEY code when the request body is not a valid key TODO more clearly define this
+        * Endpoint MUST return 400 with the MALFORMED_REQUEST_BODY code when the request body is not a valid JSON object
+        * Endpoint MUST return 400 with the MALFORMED_METADATA_FIELD code when the metadata field is not an empty or base64 encoded string
+        * Endpoint MUST return 400 with the MALFORMED_KEY_FIELD code when the request body is not a valid key TODO more clearly define this
         * Endpoint MAY return 400 with the DUPLICATE_KEY code when the key is already associated with the user
         * Endpoint MUST generate a new id and assign it as the key ID
-        * Endpoint MUST store the entire request body as the key
+        * Endpoint MUST store the key and metadata
         * Endpoint MUST return 201 with the key ID
       tags:
         - User
@@ -1472,21 +1474,24 @@ paths:
           schema:
             type: string
             format: uuid
-        - name: Digest
-          in: header
-          description: The SHA-256 hash of the request body.
-          required: true
-          schema:
-            type: string
-            example: sha-256=YTU......
       requestBody:
-        description: Binary metadata
+        description: Key data
         required: true
         content:
-          application/octet-stream:
+          application/json:
             schema:
-              type: string
-              format: binary
+              type: object
+              properties:
+                metadata:
+                  description: Key metadata (base64 encoded string), or an empty string if there is no metadata.
+                  type: string
+                  format: base64
+                  example: QXY...
+                key:
+                  description: Key data.
+                  type: string
+                  example: QXY...
+              required: [metadata, key]
       responses:
         '201':
           description: User key added.
@@ -1508,7 +1513,7 @@ paths:
                   code:
                     description: The error code.
                     type: string
-                    enum: [MALFORMED_USER_ID, MISSING_DIGEST_HEADER, MALFORMED_DIGEST_HEADER, DIGEST_BODY_MISMATCH, MALFORMED_KEY, DUPLICATE_KEY]
+                    enum: [MALFORMED_USER_ID, MALFORMED_REQUEST_BODY, MALFORMED_METADATA_FIELD, MALFORMED_KEY_FIELD, DUPLICATE_KEY]
                   description:
                     description: The error description.
                     type: string
@@ -1546,7 +1551,6 @@ paths:
         * Endpoint MUST return 404 with the USER_NOT_FOUND code when the user is not found
         * Endpoint MAY return 400 with the MALFORMED_KEY_ID code when the path parameter `keyId` is malformed
         * Endpoint MAY return 404 with the KEY_NOT_FOUND code when the key is not found
-        * Endpoint MUST calculate and set the Digest header for every 2XX response
         * Endpoint MUST return 200 with the key on success
       tags:
         - User
@@ -1567,17 +1571,24 @@ paths:
       responses:
         '200':
           description: User key.
-          headers:
-            Digest:
-              description: A SHA-256 has of the response body
-              schema:
-                type: string
-                example: sha-256=YTU......
           content:
-            application/octet-stream:
+            application/json:
               schema:
-                type: string
-                format: binary
+                type: object
+                properties:
+                  id:
+                    description: Key id.
+                    type: string
+                  metadata:
+                    description: Key metadata (base64 encoded string), or an empty string if there is no metadata.
+                    type: string
+                    format: base64
+                    example: QXY...
+                  key:
+                    description: Key data.
+                    type: string
+                    example: QXY...
+                required: [metadata, key]
         '400':
           description: Bad Request.
           content:
@@ -2691,6 +2702,9 @@ components:
             properties:
               id:
                 description: The key ID.
+                type: string
+              metadata:
+                description: The key metadata.
                 type: string
               key:
                 description: The key.
